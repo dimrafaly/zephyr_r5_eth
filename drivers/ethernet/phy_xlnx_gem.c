@@ -816,6 +816,192 @@ static enum eth_xlnx_link_speed phy_xlnx_gem_ti_dp83822_poll_lspd(
 	return link_speed;
 }
 
+/*
+ * Vendor-specific PHY management functions for:
+ * Micrel KSZ9031
+ * Register IDs & procedures are based on the corresponding datasheets:
+ * https://ww1.microchip.com/downloads/en/devicedoc/00002117f.pdf
+ *
+ */
+
+/**
+ * @brief Micrel KSZ9031 reset function
+ * Reset function for the Micrel KSZ9031 PHY
+ *
+ * @param dev Pointer to the device data
+ */
+static void phy_xlnx_gem_micrel_ksz9031_reset(const struct device *dev) {
+    const struct eth_xlnx_gem_dev_cfg *dev_conf = dev->config;
+    struct eth_xlnx_gem_dev_data *dev_data = dev->data;
+    uint16_t phy_data;
+    uint32_t retries = 0;
+
+    // Read the control register and set the reset bit
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    phy_data |= PHY_MICREL_BASIC_CONTROL_RESET_BIT;
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
+
+    // Wait for the reset bit to clear
+    while ((phy_data & PHY_MICREL_BASIC_CONTROL_RESET_BIT) != 0 && retries++ < 10) {
+        phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    }
+
+    if (retries == 10) {
+        LOG_WRN("KSZ9031 reset timed out");
+    }
+}
+
+/**
+ * @brief Micrel KSZ9031 configuration function
+ * Configuration function for the Micrel KSZ9031 PHY
+ *
+ * @param dev Pointer to the device data
+ */
+static void phy_xlnx_gem_micrel_ksz9031_config(const struct device *dev) {
+    const struct eth_xlnx_gem_dev_cfg *dev_conf = dev->config;
+    struct eth_xlnx_gem_dev_data *dev_data = dev->data;
+    uint16_t phy_data;
+	uint32_t retries = 0;
+
+	// Configure phy specific timing settings
+    //Ctrl Delay
+    uint16_t RxCtrlDelay=7; // 0..15, default 7
+    uint16_t TxCtrlDelay=7; // 0..15, default 7
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0004);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxCtrlDelay+(RxCtrlDelay<<4)));
+
+    //Data Delay
+    uint16_t RxDataDelay=7; // 0..15, default 7
+    uint16_t TxDataDelay=7; // 0..15, default 7
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0005);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxDataDelay+(RxDataDelay << 4)+(RxDataDelay << 8)+(RxDataDelay << 12)));
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0006);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxDataDelay+(TxDataDelay << 4)+(TxDataDelay << 8)+(TxDataDelay << 12)));
+ 
+    //Clock Delay
+    uint16_t RxClockDelay=31; // 0..31, default 15
+    uint16_t TxClockDelay=31; // 0..31, default 15
+
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0008);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxClockDelay+(TxClockDelay<<5)));
+
+
+    // Read the control register and set the reset bit
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    phy_data |= PHY_MICREL_BASIC_CONTROL_RESET_BIT;
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
+
+    // Wait for the reset bit to clear
+    while ((phy_data & PHY_MICREL_BASIC_CONTROL_RESET_BIT) != 0 && retries++ < 10) {
+        phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    }
+
+    if (retries == 10) {
+        LOG_WRN("KSZ9031 reset timed out");
+    }
+
+    // Enable and restart auto-negotiation
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    phy_data |= PHY_MICREL_BASIC_CONTROL_AUTONEG_ENABLE_BIT;
+	phy_data &= ~(PHY_MICREL_BASIC_CONTROL_ISOLATE_BIT);
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
+
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    phy_data |= PHY_MICREL_BASIC_CONTROL_RESTART_AUTONEG_BIT;
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
+
+	phy_data = 0;
+    // Wait for auto-negotiation finished
+    while (((phy_data & PHY_MICREL_BASIC_STATUS_AUTONEG_COMPLETED_BIT) != PHY_MICREL_BASIC_STATUS_AUTONEG_COMPLETED_BIT) && retries++ < 100) {
+        phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_STATUS_REGISTER);
+    }
+	if(retries==100) {
+    	LOG_ERR("Auto negotiation failed");
+	}
+}
+
+/**
+ * @brief Micrel KSZ9031 configuration function PHY status change polling function
+ * Status change polling function for the Micrel KSZ9031 configuration function PHY
+ *
+ * @param dev Pointer to the device data
+ * @return A set of bits indicating whether one or more of the following
+ *         events has occurred: auto-negotiation completed, link state
+ *         changed, link speed changed.
+ */
+static uint16_t phy_xlnx_gem_micrel_ksz9031_poll_sc(const struct device *dev) {
+    const struct eth_xlnx_gem_dev_cfg *dev_conf = dev->config;
+    struct eth_xlnx_gem_dev_data *dev_data = dev->data;
+    uint16_t phy_data;
+    uint16_t phy_status = 0;
+
+    // Read the interrupt status register to detect link or speed changes
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_INTERRUPT_STATUS_REGISTER);
+
+    if (phy_data & PHY_MICREL_LINK_DOWN_STATUS_INTERRUPT) {
+        phy_status |= PHY_XLNX_GEM_EVENT_LINK_STATE_CHANGED;
+    }
+    if (phy_data & PHY_MICREL_LINK_UP_STATUS_INTERRUPT) {
+        phy_status |= PHY_XLNX_GEM_EVENT_LINK_STATE_CHANGED;
+    }
+    if (phy_data & PHY_MICREL_LINK_PARTNER_ACKNOWLEDGE_INTERRUPT) {
+        phy_status |= PHY_XLNX_GEM_EVENT_AUTONEG_COMPLETE;
+    }
+
+    return phy_status;
+}
+
+/**
+ * @brief Micrel KSZ9031 PHY link status polling function
+ * Link status polling function for theMicrel KSZ9031 PHY
+ *
+ * @param dev Pointer to the device data
+ * @return 1 if the PHY indicates link up, 0 if the link is down
+ */
+static uint8_t phy_xlnx_gem_micrel_ksz9031_poll_lsts(const struct device *dev) {
+    const struct eth_xlnx_gem_dev_cfg *dev_conf = dev->config;
+    struct eth_xlnx_gem_dev_data *dev_data = dev->data;
+    uint16_t phy_data;
+
+    // Read the basic status register to check the link status
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_STATUS_REGISTER);
+
+    return (phy_data & PHY_MICREL_BASIC_STATUS_LINK_UP) != 0;
+}
+
+/**
+ * @brief Micrel KSZ9031 PHY link speed polling function
+ * Link speed polling function for the Micrel KSZ9031 PHY
+ *
+ * @param dev Pointer to the device data
+ * @return    Enum containing the current link speed reported by the PHY
+ */
+static enum eth_xlnx_link_speed phy_xlnx_gem_micrel_ksz9031_poll_lspd(const struct device *dev) {
+    const struct eth_xlnx_gem_dev_cfg *dev_conf = dev->config;
+    struct eth_xlnx_gem_dev_data *dev_data = dev->data;
+    uint16_t phy_data;
+
+    // Read the specific status register to determine the link speed
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_CONTROL_REGISTER);
+
+    if (phy_data & PHY_MICREL_CONTROL_REGISTER_SPEED_1000MBPS) {
+        return LINK_1GBIT;
+    } else if (phy_data & PHY_MICREL_CONTROL_REGISTER_SPEED_100MBPS) {
+        return LINK_100MBIT;
+    } else if (phy_data & PHY_MICREL_CONTROL_REGISTER_SPEED_10MBPS) {
+        return LINK_10MBIT;
+    } else {
+        return LINK_DOWN;
+    }
+}
 /**
  * @brief Marvell Alaska PHY function pointer table
  * Function pointer table for the Marvell Alaska PHY series
@@ -840,6 +1026,18 @@ static struct phy_xlnx_gem_api phy_xlnx_gem_ti_dp83822_api = {
 	.phy_poll_status_change_func = phy_xlnx_gem_ti_dp83822_poll_sc,
 	.phy_poll_link_status_func   = phy_xlnx_gem_ti_dp83822_poll_lsts,
 	.phy_poll_link_speed_func    = phy_xlnx_gem_ti_dp83822_poll_lspd
+};
+/**
+ * @brief Microchip KSZ9031 PHY function pointer table
+ * Function pointer table for the Microchip KSZ9031 PHY
+ * series specific management functions
+ */
+static struct phy_xlnx_gem_api phy_xlnx_gem_micrel_ksz9031_api = {
+	.phy_reset_func              = phy_xlnx_gem_micrel_ksz9031_reset,
+	.phy_configure_func          = phy_xlnx_gem_micrel_ksz9031_config,
+	.phy_poll_status_change_func = phy_xlnx_gem_micrel_ksz9031_poll_sc,
+	.phy_poll_link_status_func   = phy_xlnx_gem_micrel_ksz9031_poll_lsts,
+	.phy_poll_link_speed_func    = phy_xlnx_gem_micrel_ksz9031_poll_lspd
 };
 
 /*
@@ -880,6 +1078,12 @@ static struct phy_xlnx_gem_supported_dev phy_xlnx_gem_supported_devs[] = {
 		.phy_id_mask = PHY_TI_PHY_ID_MODEL_MASK,
 		.api         = &phy_xlnx_gem_ti_dp83822_api,
 		.identifier  = "Texas Instruments TLK105"
+	},
+	{
+		.phy_id      = PHY_MICREL_ID_MODEL_KSZ9031,
+		.phy_id_mask = PHY_MICREL_PHY_ID_MODEL_MASK,
+		.api         = &phy_xlnx_gem_micrel_ksz9031_api,
+		.identifier  = "Micrel ksz9031"
 	}
 };
 

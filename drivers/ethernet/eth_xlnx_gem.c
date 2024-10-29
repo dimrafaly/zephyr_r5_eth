@@ -793,31 +793,31 @@ static void eth_xlnx_gem_configure_clocks(const struct device *dev)
 	 * Unlock CRL_APB write access if the write protect bit
 	 * is currently set, restore it afterwards.
 	 */
-	clk_ctrl_reg  = sys_read32(dev_conf->clk_ctrl_reg_address);
-	clk_ctrl_reg &= ~((ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK <<
-			ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR0_SHIFT) |
-			(ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK <<
-			ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR1_SHIFT));
-	clk_ctrl_reg |=	((div0 & ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK) <<
-			ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR0_SHIFT) |
-			((div1 & ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK) <<
-			ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR1_SHIFT);
-	clk_ctrl_reg |=	ETH_XLNX_CRL_APB_GEMX_REF_CTRL_RX_CLKACT_BIT |
-			ETH_XLNX_CRL_APB_GEMX_REF_CTRL_CLKACT_BIT;
+	// clk_ctrl_reg  = sys_read32(dev_conf->clk_ctrl_reg_address);
+	// clk_ctrl_reg &= ~((ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK <<
+	// 		ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR0_SHIFT) |
+	// 		(ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK <<
+	// 		ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR1_SHIFT));
+	// clk_ctrl_reg |=	((div0 & ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK) <<
+	// 		ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR0_SHIFT) |
+	// 		((div1 & ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR_MASK) <<
+	// 		ETH_XLNX_CRL_APB_GEMX_REF_CTRL_DIVISOR1_SHIFT);
+	// clk_ctrl_reg |=	ETH_XLNX_CRL_APB_GEMX_REF_CTRL_RX_CLKACT_BIT |
+	// 		ETH_XLNX_CRL_APB_GEMX_REF_CTRL_CLKACT_BIT;
 
-	/*
-	 * Unlock CRL_APB write access if the write protect bit
-	 * is currently set, restore it afterwards.
-	 */
-	tmp = sys_read32(ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
-	if ((tmp & ETH_XLNX_CRL_APB_WPROT_BIT) > 0) {
-		sys_write32((tmp & ~ETH_XLNX_CRL_APB_WPROT_BIT),
-			    ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
-	}
-	sys_write32(clk_ctrl_reg, dev_conf->clk_ctrl_reg_address);
-	if ((tmp & ETH_XLNX_CRL_APB_WPROT_BIT) > 0) {
-		sys_write32(tmp, ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
-	}
+	// /*
+	//  * Unlock CRL_APB write access if the write protect bit
+	//  * is currently set, restore it afterwards.
+	//  */
+	// tmp = sys_read32(ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
+	// if ((tmp & ETH_XLNX_CRL_APB_WPROT_BIT) > 0) {
+	// 	sys_write32((tmp & ~ETH_XLNX_CRL_APB_WPROT_BIT),
+	// 		    ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
+	// }
+	// sys_write32(clk_ctrl_reg, dev_conf->clk_ctrl_reg_address);
+	// if ((tmp & ETH_XLNX_CRL_APB_WPROT_BIT) > 0) {
+	// 	sys_write32(tmp, ETH_XLNX_CRL_APB_WPROT_REGISTER_ADDRESS);
+	// }
 # elif defined(CONFIG_SOC_FAMILY_XILINX_ZYNQ7000)
 	clk_ctrl_reg  = sys_read32(dev_conf->clk_ctrl_reg_address);
 	clk_ctrl_reg &= ~((ETH_XLNX_SLCR_GEMX_CLK_CTRL_DIVISOR_MASK <<

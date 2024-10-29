@@ -122,6 +122,41 @@
 #define PHY_TI_PHY_STATUS_LINK_BIT			(1 << 0)
 #define PHY_TI_PHY_STATUS_SPEED_BIT			(1 << 1)
 
+/* Micrel KSZ9031*/
+// Micrel KSZ9031 PHY ID
+#define PHY_MICREL_ID_MODEL_KSZ9031  0x00221620
+#define PHY_MICREL_PHY_ID_MODEL_MASK 0x00fffff0
+
+// PHY register addresses
+#define PHY_MICREL_BASIC_CONTROL_REGISTER 0x00 // Basic Control Register
+#define PHY_MICREL_BASIC_STATUS_REGISTER  0x01 // Basic Status Register
+
+// Basic Control Register (0x00) bit masks
+#define PHY_MICREL_BASIC_CONTROL_RESET_BIT           (1 << 15) // Reset bit
+#define PHY_MICREL_BASIC_CONTROL_AUTONEG_ENABLE_BIT  (1 << 12) // Auto-negotiation enable
+#define PHY_MICREL_BASIC_CONTROL_ISOLATE_BIT         (1 << 10) // Electrically isolate PHY
+#define PHY_MICREL_BASIC_CONTROL_RESTART_AUTONEG_BIT (1 << 9)  // Restart auto-negotiation
+
+// Basic Status Register (0x01) bit masks
+#define PHY_MICREL_BASIC_STATUS_AUTONEG_COMPLETED_BIT (1 << 5) // Auto-negotiation complete
+#define PHY_MICREL_BASIC_STATUS_LINK_UP               (1 << 2) // Link status bit
+
+// KSZ9031-Specific Registers
+#define PHY_MICREL_MMD_ACCESS_CONTROL        0x0D // Acces Control Register
+#define PHY_MICREL_MMD_ACCESS_REGISTER_DATA  0x0E // Basic Status Register
+#define PHY_MICREL_CONTROL_REGISTER          0x1F // Control register
+#define PHY_MICREL_INTERRUPT_STATUS_REGISTER 0x1B // Interrupt Status Register
+
+// PHY Status Register (0x1F) bit masks
+#define PHY_MICREL_CONTROL_REGISTER_SPEED_1000MBPS (1 << 6) // 1000 Mbps speed status
+#define PHY_MICREL_CONTROL_REGISTER_SPEED_100MBPS  (1 << 5) // 100 Mbps speed status
+#define PHY_MICREL_CONTROL_REGISTER_SPEED_10MBPS   (1 << 4) // 10 Mbps speed status
+
+// Interrupt Status Register (0x1B) bit masks
+#define PHY_MICREL_LINK_DOWN_STATUS_INTERRUPT         (1 << 2) // Link status change interrupt
+#define PHY_MICREL_LINK_UP_STATUS_INTERRUPT           (1 << 0) // Link status change interrupt
+#define PHY_MICREL_LINK_PARTNER_ACKNOWLEDGE_INTERRUPT (1 << 3) // Link status change interrupt
+
 /**
  * @brief Vendor-specific PHY management function pointer table struct
  *
