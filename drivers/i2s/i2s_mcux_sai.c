@@ -1,5 +1,5 @@
 /*
- * Copyright 2021,2023 NXP Semiconductor INC.
+ * Copyright 2021,2023-2024 NXP Semiconductor INC.
  * All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -88,6 +88,7 @@ struct i2s_mcux_config {
 	uint32_t pll_pd;
 	uint32_t pll_num;
 	uint32_t pll_den;
+	uint32_t *mclk_control_base;
 	uint32_t mclk_pin_mask;
 	uint32_t mclk_pin_offset;
 	uint32_t tx_channel;
@@ -299,7 +300,6 @@ static void i2s_dma_tx_callback(const struct device *dma_dev, void *arg, uint32_
 			strm->state = I2S_STATE_ERROR;
 			goto disabled_exit_no_drop;
 		}
-		dma_start(dev_data->dev_dma, strm->dma_channel);
 
 		if (blocks_queued || (strm->free_tx_dma_blocks < MAX_TX_DMA_BLOCKS)) {
 			goto enabled_exit;
@@ -389,7 +389,6 @@ static void i2s_dma_rx_callback(const struct device *dma_dev, void *arg, uint32_
 						ret);
 				}
 
-				dma_start(dev_data->dev_dma, strm->dma_channel);
 			}
 		} else {
 			i2s_rx_stream_disable(dev, true, false);
@@ -408,12 +407,12 @@ static void enable_mclk_direction(const struct device *dev, bool dir)
 	const struct i2s_mcux_config *dev_cfg = dev->config;
 	uint32_t offset = dev_cfg->mclk_pin_offset;
 	uint32_t mask = dev_cfg->mclk_pin_mask;
-	uint32_t *gpr = (uint32_t *)(DT_REG_ADDR(DT_NODELABEL(iomuxcgpr)) + offset);
+	uint32_t *base = (uint32_t *)(dev_cfg->mclk_control_base + offset);
 
 	if (dir) {
-		*gpr |= mask;
+		*base |= mask;
 	} else {
-		*gpr &= ~mask;
+		*base &= ~mask;
 	}
 }
 
@@ -1161,7 +1160,7 @@ static int i2s_mcux_initialize(const struct device *dev)
 	return 0;
 }
 
-static const struct i2s_driver_api i2s_mcux_driver_api = {
+static DEVICE_API(i2s, i2s_mcux_driver_api) = {
 	.configure = i2s_mcux_config,
 	.read = i2s_mcux_read,
 	.write = i2s_mcux_write,
@@ -1184,6 +1183,8 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 		.pll_pd = DT_PHA_BY_NAME(DT_DRV_INST(i2s_id), pll_clocks, pd, value),              \
 		.pll_num = DT_PHA_BY_NAME(DT_DRV_INST(i2s_id), pll_clocks, num, value),            \
 		.pll_den = DT_PHA_BY_NAME(DT_DRV_INST(i2s_id), pll_clocks, den, value),            \
+		.mclk_control_base =                                                               \
+			(uint32_t *)DT_REG_ADDR(DT_PHANDLE(DT_DRV_INST(i2s_id), pinmuxes)),    \
 		.mclk_pin_mask = DT_PHA_BY_IDX(DT_DRV_INST(i2s_id), pinmuxes, 0, function),        \
 		.mclk_pin_offset = DT_PHA_BY_IDX(DT_DRV_INST(i2s_id), pinmuxes, 0, pin),           \
 		.clk_sub_sys =                                                                     \
@@ -1213,6 +1214,7 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 						.channel_direction = MEMORY_TO_PERIPHERAL,         \
 						.dma_slot = DT_INST_DMAS_CELL_BY_NAME(i2s_id, tx,  \
 										      source),     \
+						.cyclic = 1,                                       \
 					},                                                         \
 			},                                                                         \
 		.rx =                                                                              \
@@ -1230,6 +1232,7 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 						.channel_direction = PERIPHERAL_TO_MEMORY,         \
 						.dma_slot = DT_INST_DMAS_CELL_BY_NAME(i2s_id, rx,  \
 										      source),     \
+						.cyclic = 1,                                       \
 					},                                                         \
 			},                                                                         \
 	};                                                                                         \

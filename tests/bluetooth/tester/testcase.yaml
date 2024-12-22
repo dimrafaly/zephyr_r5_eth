@@ -15,7 +15,7 @@ tests:
       - rd_rw612_bga
       - frdm_rw612
     extra_configs:
-      - CONFIG_NXP_MONOLITHIC_BT=n
+      - CONFIG_NXP_MONOLITHIC_NBU=n
   bluetooth.general.tester_le_audio:
     build_only: true
     platform_allow:
@@ -23,9 +23,14 @@ tests:
       - native_sim
       - nrf5340dk/nrf5340/cpuapp
       - nrf5340_audio_dk/nrf5340/cpuapp
-    extra_args: EXTRA_CONF_FILE="overlay-le-audio.conf"
+    integration_platforms:
+      - nrf5340dk/nrf5340/cpuapp
+      - nrf5340_audio_dk/nrf5340/cpuapp
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-le-audio.conf"
     tags: bluetooth
     harness: bluetooth
+    sysbuild: true
   bluetooth.general.tester_mesh:
     build_only: true
     platform_allow:

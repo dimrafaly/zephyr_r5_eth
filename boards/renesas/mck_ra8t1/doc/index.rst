@@ -106,6 +106,14 @@ The below features are currently supported on Zephyr OS for MCB-RA8T1 board:
 +--------------+------------+----------------------+
 | COUNTER      | on-chip    | counter              |
 +--------------+------------+----------------------+
+| CAN          | on-chip    | canfd                |
++--------------+------------+----------------------+
+| I2C          | on-chip    | i2c                  |
++--------------+------------+----------------------+
+| ETHERNET     | on-chip    | ethernet             |
++--------------+------------+----------------------+
+| ADC          | on-chip    | adc                  |
++--------------+------------+----------------------+
 
 Other hardware features are currently not supported by the port.
 

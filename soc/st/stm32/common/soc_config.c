@@ -16,6 +16,15 @@
 #include <stm32_ll_bus.h>
 #include <stm32_ll_pwr.h>
 
+#if CONFIG_PM
+
+#if !defined(CONFIG_DEBUG) && defined(CONFIG_STM32_ENABLE_DEBUG_SLEEP_STOP)
+#warning "Running with PM=y and STM32_ENABLE_DEBUG_SLEEP_STOP=y, \
+this will result in increased power consumption during sleep."
+#endif
+
+#endif /* CONFIG_PM */
+
 /**
  * @brief Perform SoC configuration at boot.
  *
@@ -28,14 +37,15 @@ static int st_stm32_common_config(void)
 {
 #ifdef CONFIG_LOG_BACKEND_SWO
 	/* Enable SWO trace asynchronous mode */
-#if defined(CONFIG_SOC_SERIES_STM32WBX) || defined(CONFIG_SOC_SERIES_STM32H5X)
+#if defined(CONFIG_SOC_SERIES_STM32H5X) || defined(CONFIG_SOC_SERIES_STM32H7RSX) ||                \
+	defined(CONFIG_SOC_SERIES_STM32L5X) || defined(CONFIG_SOC_SERIES_STM32U5X) ||              \
+	defined(CONFIG_SOC_SERIES_STM32WBX)
 	LL_DBGMCU_EnableTraceClock();
 #endif
 #if !defined(CONFIG_SOC_SERIES_STM32WBX) && defined(DBGMCU_CR_TRACE_IOEN)
 	LL_DBGMCU_SetTracePinAssignment(LL_DBGMCU_TRACE_ASYNCH);
 #endif
 #endif /* CONFIG_LOG_BACKEND_SWO */
-
 
 #if defined(CONFIG_USE_SEGGER_RTT)
 	/* On some STM32 boards, for unclear reason,
@@ -48,7 +58,6 @@ static int st_stm32_common_config(void)
 #elif defined(__HAL_RCC_GPDMA1_CLK_ENABLE)
 	__HAL_RCC_GPDMA1_CLK_ENABLE();
 #endif /* __HAL_RCC_DMA1_CLK_ENABLE */
-
 
 #endif /* CONFIG_USE_SEGGER_RTT */
 

@@ -257,8 +257,10 @@ void log_core_init(void)
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_init();
 
-		for (uint16_t s = 0; s < log_src_cnt_get(0); s++) {
-			log_frontend_filter_set(s, CONFIG_LOG_MAX_LEVEL);
+		if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
+			for (uint16_t s = 0; s < log_src_cnt_get(0); s++) {
+				log_frontend_filter_set(s, CONFIG_LOG_MAX_LEVEL);
+			}
 		}
 
 		if (IS_ENABLED(CONFIG_LOG_FRONTEND_ONLY)) {
@@ -705,7 +707,7 @@ union log_msg_generic *z_log_msg_local_claim(void)
 union log_msg_generic *z_log_msg_claim_oldest(k_timeout_t *backoff)
 {
 	union log_msg_generic *msg = NULL;
-	struct log_msg_ptr *chosen;
+	struct log_msg_ptr *chosen = NULL;
 	log_timestamp_t t_min = sizeof(log_timestamp_t) > sizeof(uint32_t) ?
 				UINT64_MAX : UINT32_MAX;
 	int i = 0;

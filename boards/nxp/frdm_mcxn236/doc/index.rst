@@ -65,6 +65,8 @@ The FRDM-MCXN236 board configuration supports the following hardware features:
 +-----------+------------+-------------------------------------+
 | ADC       | on-chip    | adc                                 |
 +-----------+------------+-------------------------------------+
+| USBHS     | on-chip    | USB device                          |
++-----------+------------+-------------------------------------+
 | LPCMP     | on-chip    | sensor(comparator)                  |
 +-----------+------------+-------------------------------------+
 | FLEXCAN   | on-chip    | CAN                                 |
@@ -75,6 +77,10 @@ The FRDM-MCXN236 board configuration supports the following hardware features:
 |           |            | :ref:`lcd_par_s035`                 |
 +-----------+------------+-------------------------------------+
 | LPTMR     | on-chip    | counter                             |
++-----------+------------+-------------------------------------+
+| MRT       | on-chip    | counter                             |
++-----------+------------+-------------------------------------+
+| RTC       | on-chip    | rtc                                 |
 +-----------+------------+-------------------------------------+
 
 Targets available
@@ -196,6 +202,12 @@ should see the following message in the terminal:
 
    *** Booting Zephyr OS build v3.6.0-4478-ge6c3a42f5f52 ***
    Hello World! frdm_mcxn236/mcxn236
+
+Troubleshooting
+===============
+
+.. include:: ../../common/segger-ecc-systemview.rst
+   :start-after: segger-ecc-systemview
 
 .. _MCX-N236 SoC Website:
    https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-n-series-microcontrollers/mcx-n23x-highly-integrated-mcus-with-on-chip-accelerators-intelligent-peripherals-and-advanced-security:MCX-N23X
