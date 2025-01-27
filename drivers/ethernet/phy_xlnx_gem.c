@@ -846,7 +846,7 @@ static void phy_xlnx_gem_micrel_ksz9031_reset(const struct device *dev) {
         phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
     }
 
-    if (retries == 10) {
+    if (retries >= 10) {
         LOG_WRN("KSZ9031 reset timed out");
     }
 }
@@ -870,7 +870,7 @@ static void phy_xlnx_gem_micrel_ksz9031_config(const struct device *dev) {
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0004);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
-    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxCtrlDelay+(RxCtrlDelay<<4)));
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxCtrlDelay | (RxCtrlDelay<<4)));
 
     //Data Delay
     uint16_t RxDataDelay=7; // 0..15, default 7
@@ -878,20 +878,20 @@ static void phy_xlnx_gem_micrel_ksz9031_config(const struct device *dev) {
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0005);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
-    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxDataDelay+(RxDataDelay << 4)+(RxDataDelay << 8)+(RxDataDelay << 12)));
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxDataDelay | (RxDataDelay << 4) | (RxDataDelay << 8) | (RxDataDelay << 12)));
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0006);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
-    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxDataDelay+(TxDataDelay << 4)+(TxDataDelay << 8)+(TxDataDelay << 12)));
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (TxDataDelay | (TxDataDelay << 4) | (TxDataDelay << 8) | (TxDataDelay << 12)));
  
     //Clock Delay
-    uint16_t RxClockDelay=31; // 0..31, default 15
+    uint16_t RxClockDelay=15; // 0..31, default 15
     uint16_t TxClockDelay=31; // 0..31, default 15
 
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0008);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x4002);
-    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxClockDelay+(TxClockDelay<<5)));
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, (RxClockDelay | (TxClockDelay<<5)));
 
 
     // Read the control register and set the reset bit
@@ -904,26 +904,49 @@ static void phy_xlnx_gem_micrel_ksz9031_config(const struct device *dev) {
         phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
     }
 
-    if (retries == 10) {
+    if (retries >= 10) {
         LOG_WRN("KSZ9031 reset timed out");
     }
 
+
+	// Config auto-egotiation
+	
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_ANEG_ADVERTISEMENT_REGISTER);
+	phy_data |= PHY_MICREL_ASYMMETRIC_PAUSE_MASK | PHY_MICREL_ADVERTISE_10_MASK | PHY_MICREL_ADVERTISE_100_MASK;
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_ANEG_ADVERTISEMENT_REGISTER, phy_data);
+
+    phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_1000_ANEG_ADVERTISEMENT_REGISTER);
+	phy_data |= PHY_MICREL_ADVERTISE_1000_MASK;
+    phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_1000_ANEG_ADVERTISEMENT_REGISTER, phy_data);
+
     // Enable and restart auto-negotiation
     phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
-    phy_data |= PHY_MICREL_BASIC_CONTROL_AUTONEG_ENABLE_BIT;
+    phy_data |= PHY_MICREL_BASIC_CONTROL_AUTONEG_ENABLE_BIT | PHY_MICREL_BASIC_CONTROL_RESTART_AUTONEG_BIT;
 	phy_data &= ~(PHY_MICREL_BASIC_CONTROL_ISOLATE_BIT);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
 
     phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
-    phy_data |= PHY_MICREL_BASIC_CONTROL_RESTART_AUTONEG_BIT;
+    phy_data |= PHY_MICREL_BASIC_CONTROL_RESET_BIT;
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER, phy_data);
+	retries = 0;
+
+    // Wait for the reset bit to clear
+    while ((phy_data & PHY_MICREL_BASIC_CONTROL_RESET_BIT) != 0 && retries++ < 10) {
+        phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_CONTROL_REGISTER);
+    }
+
+    if (retries >= 10) {
+        LOG_WRN("KSZ9031 reset timed out");
+    }
 
 	phy_data = 0;
+	retries = 0;
     // Wait for auto-negotiation finished
     while (((phy_data & PHY_MICREL_BASIC_STATUS_AUTONEG_COMPLETED_BIT) != PHY_MICREL_BASIC_STATUS_AUTONEG_COMPLETED_BIT) && retries++ < 100) {
+		k_sleep(K_MSEC(50));
         phy_data = phy_xlnx_gem_mdio_read(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_BASIC_STATUS_REGISTER);
     }
-	if(retries==100) {
+	if(retries>=100) {
     	LOG_ERR("Auto negotiation failed");
 	}
 }

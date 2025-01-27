@@ -130,6 +130,8 @@
 // PHY register addresses
 #define PHY_MICREL_BASIC_CONTROL_REGISTER 0x00 // Basic Control Register
 #define PHY_MICREL_BASIC_STATUS_REGISTER  0x01 // Basic Status Register
+#define PHY_MICREL_ANEG_ADVERTISEMENT_REGISTER  0x04 // ANEG register
+#define PHY_MICREL_1000_ANEG_ADVERTISEMENT_REGISTER  0x09 // 1000 ANEG register
 
 // Basic Control Register (0x00) bit masks
 #define PHY_MICREL_BASIC_CONTROL_RESET_BIT           (1 << 15) // Reset bit
@@ -156,6 +158,14 @@
 #define PHY_MICREL_LINK_DOWN_STATUS_INTERRUPT         (1 << 2) // Link status change interrupt
 #define PHY_MICREL_LINK_UP_STATUS_INTERRUPT           (1 << 0) // Link status change interrupt
 #define PHY_MICREL_LINK_PARTNER_ACKNOWLEDGE_INTERRUPT (1 << 3) // Link status change interrupt
+
+// Auto negotiation Advertisement (0x4) bit masks
+#define PHY_MICREL_ASYMMETRIC_PAUSE_MASK				(2 << 10)
+#define PHY_MICREL_ADVERTISE_100_MASK					(1 << 8)
+#define PHY_MICREL_ADVERTISE_10_MASK					(1 << 6)
+
+// 1000 Auto negotiation Advertisement (0x9) bit masks
+#define PHY_MICREL_ADVERTISE_1000_MASK					(1 << 9)
 
 /**
  * @brief Vendor-specific PHY management function pointer table struct
