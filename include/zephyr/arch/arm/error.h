@@ -53,16 +53,16 @@ do {\
  * z_check_stack_sentinel call if it is not stacked before the svc.
  */
 #define ARCH_EXCEPT(reason_p) \
-register uint32_t r0 __asm__("r0") = reason_p; \
 do { \
-	__asm__ volatile ( \
-		"push {lr}\n\t" \
-		"cpsie i\n\t" \
-		"svc %[id]\n\t" \
-		"pop {lr}\n\t" \
-		: \
-		: "r" (r0), [id] "i" (_SVC_CALL_RUNTIME_EXCEPT) \
-		: "memory"); \
+    __asm__ volatile ( \
+        "push {lr}\n\t" \
+        "cpsie i\n\t" \
+        "mov r0, %0\n\t" \
+        "svc %[id]\n\t" \
+        "pop {lr}\n\t" \
+        : \
+        : "r" (reason_p), [id] "i" (_SVC_CALL_RUNTIME_EXCEPT) \
+        : "r0", "memory"); \
 } while (false)
 #else
 #error Unknown ARM architecture

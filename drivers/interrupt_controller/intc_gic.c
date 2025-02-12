@@ -34,6 +34,21 @@ static const uint64_t cpu_mpid_list[] = {
 BUILD_ASSERT(ARRAY_SIZE(cpu_mpid_list) >= CONFIG_MP_MAX_NUM_CPUS,
 		"The count of CPU Cores nodes in dts is less than CONFIG_MP_MAX_NUM_CPUS\n");
 
+typedef struct {
+    unsigned int irq;       // The IRQ number
+    uint8_t cpu_mask;       // The CPU mask associated with this IRQ
+} irq_config_t;
+
+static const irq_config_t active_irqs[] = {
+    {53, 0x02}, // UART0 RPU1
+	{66, 0x02}, // ipi chanel2 RPU1
+    {69, 0x02}, // TTC0 channel1 RPU1
+    {53, 0x01}, // UART0 RPU0
+    {65, 0x01}, // ipi channel1 RPU0
+    {68, 0x01}, // TTC0  channel0 RPU0
+    {89, 0x01}, // GEM0 RPU0
+};
+
 void arm_gic_irq_enable(unsigned int irq)
 {
 	int int_grp, int_off;
@@ -178,16 +193,17 @@ void gic_raise_sgi(unsigned int sgi_id, uint64_t target_aff,
 
 static void gic_dist_init(void)
 {
-	unsigned int gic_irqs, i;
+	unsigned int gic_irqs = 195U, i;
 	uint8_t cpu_mask = 0;
 	uint32_t reg_val;
 
-	gic_irqs = sys_read32(GICD_TYPER) & 0x1f;
-	gic_irqs = (gic_irqs + 1) * 32;
-	if (gic_irqs > 1020) {
-		gic_irqs = 1020;
-	}
-
+	// gic_irqs = sys_read32(GICD_TYPER) & 0x1f;
+	// gic_irqs = (gic_irqs + 1) * 32;
+	// if (gic_irqs > 1020) {
+	// 	gic_irqs = 1020;
+	// }
+	if (cpu_mpid_list[0] == 0)
+		return;
 	/*
 	 * Disable the forwarding of pending interrupts
 	 * from the Distributor to the CPU interfaces
@@ -195,18 +211,23 @@ static void gic_dist_init(void)
 	sys_write32(0, GICD_CTLR);
 
 	/*
-	 * Enable all global interrupts distributing to CPUs listed
+	 * Enable selected global interrupts distributing to CPUs listed
 	 * in dts with the count of arch_num_cpus().
 	 */
-	unsigned int num_cpus = arch_num_cpus();
+	// unsigned int num_cpus = arch_num_cpus();
 
-	for (i = 0; i < num_cpus; i++) {
-		cpu_mask |= BIT(cpu_mpid_list[i]);
-	}
-	reg_val = cpu_mask | (cpu_mask << 8) | (cpu_mask << 16)
-		| (cpu_mask << 24);
-	for (i = GIC_SPI_INT_BASE; i < gic_irqs; i += 4) {
-		sys_write32(reg_val, GICD_ITARGETSRn + i);
+
+	for (i = 0; i < (sizeof(active_irqs) / sizeof(active_irqs[0])); i++) {
+		unsigned int irq = active_irqs[i].irq;
+		cpu_mask = active_irqs[i].cpu_mask;
+
+		uint32_t reg_offset = (irq / 4) * 4;   // Each register holds 4 interrupts
+		uint8_t byte_offset = irq % 4;         // Select the correct byte within the register
+
+		reg_val = sys_read32(GICD_ITARGETSRn + reg_offset);
+		reg_val |= (cpu_mask << (byte_offset * 8));  // Set CPU mask for the specific IRQ
+
+		sys_write32(reg_val, GICD_ITARGETSRn + reg_offset);
 	}
 
 	/*
