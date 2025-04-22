@@ -321,8 +321,9 @@ manifest:
       revision: 9612cd0f90946aa5c737530c57de2e894e16088f
       path: modules/lib/nrf_wifi
     - name: open-amp
-      revision: 52bb1783521c62c019451cee9b05b8eda9d7425f
+      revision: feature/hdm_rpc_activation
       path: modules/lib/open-amp
+      url: https://github.com/dimrafaly/open-amp.git
     - name: openthread
       revision: 2aeb8b833ba760ec29d5f340dd1ce7bcb61c5d56
       path: modules/lib/openthread
