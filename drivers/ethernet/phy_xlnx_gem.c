@@ -886,7 +886,7 @@ static void phy_xlnx_gem_micrel_ksz9031_config(const struct device *dev) {
  
     //Clock Delay
     uint16_t RxClockDelay=15; // 0..31, default 15
-    uint16_t TxClockDelay=31; // 0..31, default 15
+    uint16_t TxClockDelay=30; // 0..31, default 15
 
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_CONTROL, 0x0002);
     phy_xlnx_gem_mdio_write(dev_conf->base_addr, dev_data->phy_addr, PHY_MICREL_MMD_ACCESS_REGISTER_DATA, 0x0008);
