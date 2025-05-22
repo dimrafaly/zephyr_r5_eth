@@ -42,6 +42,12 @@
 	chosen {
 		zephyr,bt-hci = &hci_spi;
 	};
+
+	lvgl_pointer {
+		compatible = "zephyr,lvgl-pointer-input";
+		input = <&ft5336>;
+		invert-y;
+	};
 };
 
 &fmc {
@@ -177,6 +183,13 @@ stm32_lp_tick_source: &lptim1 {
 		reg = <0x6a>;
 		irq-gpios = <&gpiof 3 GPIO_ACTIVE_HIGH>;
 	};
+
+	ft5336: ft5336@38 {
+		compatible = "focaltech,ft5336";
+		reg = <0x38>;
+		int-gpios = <&gpiof 1 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpiof 15 GPIO_ACTIVE_LOW>;
+	};
 };
 
 &rng {
@@ -301,7 +314,7 @@ zephyr_udc0: &usb {
 
 &sdmmc1 {
 	status = "okay";
-
+	disk-name = "SD";
 	pinctrl-0 = <&sdmmc1_d0_pc8
 		     &sdmmc1_d1_pc9
 		     &sdmmc1_d2_pc10

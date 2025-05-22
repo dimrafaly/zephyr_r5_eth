@@ -56,6 +56,9 @@
 #elif DT_HAS_COMPAT_STATUS_OKAY(renesas_ra_pwm)
 #define PWM_DEV_NODE DT_INST(0, renesas_ra_pwm)
 
+#elif DT_HAS_COMPAT_STATUS_OKAY(renesas_rz_gpt_pwm)
+#define PWM_DEV_NODE DT_INST(0, renesas_rz_gpt_pwm)
+
 #else
 #error "Define a PWM device"
 #endif
@@ -152,17 +155,17 @@ ZTEST_USER(pwm_basic, test_pwm_nsec)
 {
 	/* Period : Pulse (2000000 : 1000000), unit (nsec). Voltage : 1.65V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_NSEC,
-				DEFAULT_PULSE_NSEC, UNIT_NSECS) == TC_PASS, NULL);
+				DEFAULT_PULSE_NSEC, UNIT_NSECS) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 
 	/* Period : Pulse (2000000 : 2000000), unit (nsec). Voltage : 3.3V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_NSEC,
-				DEFAULT_PERIOD_NSEC, UNIT_NSECS) == TC_PASS, NULL);
+				DEFAULT_PERIOD_NSEC, UNIT_NSECS) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 
 	/* Period : Pulse (2000000 : 0), unit (nsec). Voltage : 0V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_NSEC,
-				0, UNIT_NSECS) == TC_PASS, NULL);
+				0, UNIT_NSECS) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 }
 
@@ -170,17 +173,17 @@ ZTEST_USER(pwm_basic, test_pwm_cycle)
 {
 	/* Period : Pulse (64000 : 32000), unit (cycle). Voltage : 1.65V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_CYCLE,
-				DEFAULT_PULSE_CYCLE, UNIT_CYCLES) == TC_PASS, NULL);
+				DEFAULT_PULSE_CYCLE, UNIT_CYCLES) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 
 	/* Period : Pulse (64000 : 64000), unit (cycle). Voltage : 3.3V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_CYCLE,
-				DEFAULT_PERIOD_CYCLE, UNIT_CYCLES) == TC_PASS, NULL);
+				DEFAULT_PERIOD_CYCLE, UNIT_CYCLES) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 
 	/* Period : Pulse (64000 : 0), unit (cycle). Voltage : 0V */
 	zassert_true(test_task(DEFAULT_PWM_PORT, DEFAULT_PERIOD_CYCLE,
-				0, UNIT_CYCLES) == TC_PASS, NULL);
+				0, UNIT_CYCLES) == TC_PASS);
 	k_sleep(K_MSEC(1000));
 }
 

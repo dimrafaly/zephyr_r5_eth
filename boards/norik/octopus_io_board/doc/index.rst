@@ -47,6 +47,11 @@ and in the `Octopus IO-Board Documentation`_.
 Hardware
 ********
 
+Supported Features
+==================
+
+.. zephyr:board-supported-hw::
+
 Connections and IOs
 ===================
 
@@ -85,6 +90,8 @@ The board also has multiple built-in test points for measuring current consumpti
 
 Programming and Debugging
 *************************
+
+.. zephyr:board-supported-runners::
 
 Norik Octopus IO-Board can be programmed and debugged using the Tag-Connect TC2030-IDC 6-pin connector or 6-pin SWD pinheader.
 
@@ -142,5 +149,5 @@ References
 
 .. target-notes::
 
-.. _Octopus IO-Board Product Page: https://www.norik.com/2024/09/16/octopus-io-board/
+.. _Octopus IO-Board Product Page: https://www.norik.com/octopus-io-board/
 .. _Octopus IO-Board Documentation: https://www.norik.com/wp-content/uploads/2024/09/Octopus_IO-Board_Datasheet.pdf

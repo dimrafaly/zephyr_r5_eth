@@ -9,7 +9,6 @@
 
 #include <errno.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 
 #include <zephyr/autoconf.h>
@@ -26,12 +25,8 @@
 #include <zephyr/ztest_assert.h>
 #include <zephyr/ztest_test.h>
 
-#include "assert.h"
 #include "bap_unicast_server.h"
-#include "bap_unicast_server_expects.h"
 #include "bap_stream.h"
-#include "bap_stream_expects.h"
-#include "conn.h"
 
 #include "test_common.h"
 

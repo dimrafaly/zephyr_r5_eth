@@ -103,6 +103,10 @@
 #define FUNC_ALIAS(real_func, new_alias, return_type) \
 	return_type new_alias() ALIAS_OF(real_func)
 
+#if TOOLCHAIN_GCC_VERSION < 40500
+#define __builtin_unreachable() __builtin_trap()
+#endif
+
 #if defined(CONFIG_ARCH_POSIX) && !defined(_ASMLANGUAGE)
 #include <zephyr/arch/posix/posix_trace.h>
 
@@ -364,9 +368,9 @@ do {                                                                    \
 
 #if defined(_ASMLANGUAGE)
 
-#if defined(CONFIG_ARM) || defined(CONFIG_NIOS2) || defined(CONFIG_RISCV) \
+#if defined(CONFIG_ARM) || defined(CONFIG_RISCV) \
 	|| defined(CONFIG_XTENSA) || defined(CONFIG_ARM64) \
-	|| defined(CONFIG_MIPS)
+	|| defined(CONFIG_MIPS) || defined(CONFIG_RX)
 #define GTEXT(sym) .global sym; .type sym, %function
 #define GDATA(sym) .global sym; .type sym, %object
 #define WTEXT(sym) .weak sym; .type sym, %function
@@ -547,8 +551,7 @@ do {                                                                    \
 		"\n\t.equ\t" #name "," #value       \
 		"\n\t.type\t" #name ",@object")
 
-#elif defined(CONFIG_NIOS2) || defined(CONFIG_RISCV) || \
-	defined(CONFIG_XTENSA) || defined(CONFIG_MIPS)
+#elif defined(CONFIG_RISCV) || defined(CONFIG_XTENSA) || defined(CONFIG_MIPS)
 
 /* No special prefixes necessary for constants in this arch AFAICT */
 #define GEN_ABSOLUTE_SYM(name, value)		\
@@ -581,6 +584,17 @@ do {                                                                    \
 #define GEN_ABSOLUTE_SYM_KCONFIG(name, value)       \
 	__asm__(".globl\t" #name                    \
 		"\n\t.equ\t" #name "," #value       \
+		"\n\t.type\t" #name ",#object")
+
+#elif defined(CONFIG_RX)
+#define GEN_ABSOLUTE_SYM(name, value)                \
+	__asm__(".global\t" #name "\n\t.equ\t" #name \
+		",%c0"                               \
+		"\n\t.type\t" #name ",%%object" :  : "n"(value))
+
+#define GEN_ABSOLUTE_SYM_KCONFIG(name, value)        \
+	__asm__(".global\t" #name                    \
+		"\n\t.equ\t" #name "," #value        \
 		"\n\t.type\t" #name ",#object")
 
 #else
@@ -675,12 +689,36 @@ do {                                                                    \
 #define FUNC_NO_STACK_PROTECTOR
 #endif
 
-#define TOOLCHAIN_IGNORE_WSHADOW_BEGIN \
-	_Pragma("GCC diagnostic push") \
-	_Pragma("GCC diagnostic ignored \"-Wshadow\"")
-
-#define TOOLCHAIN_IGNORE_WSHADOW_END \
-	_Pragma("GCC diagnostic pop")
-
 #endif /* !_LINKER */
+
+#define TOOLCHAIN_WARNING_ADDRESS_OF_PACKED_MEMBER "-Waddress-of-packed-member"
+#define TOOLCHAIN_WARNING_ARRAY_BOUNDS             "-Warray-bounds"
+#define TOOLCHAIN_WARNING_ATTRIBUTES               "-Wattributes"
+#define TOOLCHAIN_WARNING_DELETE_NON_VIRTUAL_DTOR  "-Wdelete-non-virtual-dtor"
+#define TOOLCHAIN_WARNING_EXTRA                    "-Wextra"
+#define TOOLCHAIN_WARNING_NONNULL                  "-Wnonnull"
+#define TOOLCHAIN_WARNING_SHADOW                   "-Wshadow"
+#define TOOLCHAIN_WARNING_UNUSED_LABEL             "-Wunused-label"
+#define TOOLCHAIN_WARNING_UNUSED_VARIABLE          "-Wunused-variable"
+
+/* GCC-specific warnings that aren't in clang. */
+#if defined(__GNUC__) && !defined(__clang__)
+#define TOOLCHAIN_WARNING_POINTER_ARITH     "-Wpointer-arith"
+#define TOOLCHAIN_WARNING_STRINGOP_OVERREAD "-Wstringop-overread"
+#endif
+
+#define _TOOLCHAIN_DISABLE_WARNING(compiler, warning)                                              \
+	TOOLCHAIN_PRAGMA(compiler diagnostic push)                                                 \
+	TOOLCHAIN_PRAGMA(compiler diagnostic ignored warning)
+
+#define _TOOLCHAIN_ENABLE_WARNING(compiler, warning) TOOLCHAIN_PRAGMA(compiler diagnostic pop)
+
+#define TOOLCHAIN_DISABLE_WARNING(warning) _TOOLCHAIN_DISABLE_WARNING(GCC, warning)
+#define TOOLCHAIN_ENABLE_WARNING(warning) _TOOLCHAIN_ENABLE_WARNING(GCC, warning)
+
+#if defined(__GNUC__) && !defined(__clang__)
+#define TOOLCHAIN_DISABLE_GCC_WARNING(warning) _TOOLCHAIN_DISABLE_WARNING(GCC, warning)
+#define TOOLCHAIN_ENABLE_GCC_WARNING(warning)  _TOOLCHAIN_ENABLE_WARNING(GCC, warning)
+#endif
+
 #endif /* ZEPHYR_INCLUDE_TOOLCHAIN_GCC_H_ */

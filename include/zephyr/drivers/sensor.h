@@ -156,13 +156,16 @@ enum sensor_channel {
 	/** Revolutions per minute, in RPM. */
 	SENSOR_CHAN_RPM,
 
+	/** Frequency, in Hz. */
+	SENSOR_CHAN_FREQUENCY,
+
 	/** Voltage, in volts **/
 	SENSOR_CHAN_GAUGE_VOLTAGE,
-	/** Average current, in amps **/
+	/** Average current, in amps (negative=discharging) **/
 	SENSOR_CHAN_GAUGE_AVG_CURRENT,
-	/** Standby current, in amps **/
+	/** Standby current, in amps (negative=discharging) **/
 	SENSOR_CHAN_GAUGE_STDBY_CURRENT,
-	/** Max load current, in amps **/
+	/** Max load current, in amps (negative=discharging) **/
 	SENSOR_CHAN_GAUGE_MAX_LOAD_CURRENT,
 	/** Gauge temperature  **/
 	SENSOR_CHAN_GAUGE_TEMP,
@@ -192,6 +195,12 @@ enum sensor_channel {
 	SENSOR_CHAN_GAUGE_DESIRED_VOLTAGE,
 	/** Desired charging current in mA */
 	SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT,
+	/** Game Rotation Vector (unit quaternion components X/Y/Z/W) */
+	SENSOR_CHAN_GAME_ROTATION_VECTOR,
+	/** Gravity Vector (X/Y/Z components in m/s^2) */
+	SENSOR_CHAN_GRAVITY_VECTOR,
+	/** Gyroscope bias (X/Y/Z components in radians/s) */
+	SENSOR_CHAN_GBIAS_XYZ,
 
 	/** All channels. */
 	SENSOR_CHAN_ALL,
@@ -1200,6 +1209,25 @@ static inline void sensor_g_to_ms2(int32_t g, struct sensor_value *ms2)
 }
 
 /**
+ * @brief Helper function to convert acceleration from m/s^2 to milli Gs
+ *
+ * @param ms2 A pointer to a sensor_value struct holding the acceleration,
+ *            in m/s^2.
+ *
+ * @return The converted value, in milli Gs.
+ */
+static inline int32_t sensor_ms2_to_mg(const struct sensor_value *ms2)
+{
+	int64_t nano_ms2 = (ms2->val1 * 1000000LL + ms2->val2) * 1000LL;
+
+	if (nano_ms2 > 0) {
+		return (nano_ms2 + SENSOR_G / 2) / SENSOR_G;
+	} else {
+		return (nano_ms2 - SENSOR_G / 2) / SENSOR_G;
+	}
+}
+
+/**
  * @brief Helper function to convert acceleration from m/s^2 to micro Gs
  *
  * @param ms2 A pointer to a sensor_value struct holding the acceleration,
@@ -1439,6 +1467,28 @@ struct sensor_info {
  */
 #define SENSOR_DEVICE_DT_INST_DEFINE(inst, ...)				\
 	SENSOR_DEVICE_DT_DEFINE(DT_DRV_INST(inst), __VA_ARGS__)
+
+/**
+ * @brief Helper function for converting struct sensor_value to integer deci units.
+ *
+ * @param val A pointer to a sensor_value struct.
+ * @return The converted value.
+ */
+static inline int64_t sensor_value_to_deci(const struct sensor_value *val)
+{
+	return ((int64_t)val->val1 * 10) + val->val2 / 100000;
+}
+
+/**
+ * @brief Helper function for converting struct sensor_value to integer centi units.
+ *
+ * @param val A pointer to a sensor_value struct.
+ * @return The converted value.
+ */
+static inline int64_t sensor_value_to_centi(const struct sensor_value *val)
+{
+	return ((int64_t)val->val1 * 100) + val->val2 / 10000;
+}
 
 /**
  * @brief Helper function for converting struct sensor_value to integer milli units.

@@ -32,6 +32,14 @@ config UART_NRFX_UARTE_LEGACY_SHIM
 	bool "Legacy UARTE shim"
 	depends on UART_NRFX_UARTE
 	default y
+	help
+	  Disabling this option is deprecated.
+
+config DEPRECATED_UART_NRFX_UARTE_LEGACY_SHIM
+	bool
+	default y if !UART_NRFX_UARTE_LEGACY_SHIM
+	depends on UART_NRFX_UARTE
+	select DEPRECATED
 
 config UART_NRFX_UARTE_ENHANCED_RX
 	bool "Enhanced RX handling"
@@ -54,6 +62,14 @@ config UART_ASYNC_TX_CACHE_SIZE
 	  For UARTE, TX cache buffer is used when provided TX buffer is not located
 	  in RAM, because EasyDMA in UARTE peripherals can only transfer data
 	  from RAM.
+
+config UART_NRFX_UARTE_DIRECT_ISR
+	bool "Use direct ISR"
+
+config UART_NRFX_UARTE_SPURIOUS_RXTO_WORKAROUND
+	bool
+	help
+	  Apply workaround for spurious RXTO during restart.
 
 if HAS_HW_NRF_UART0 || HAS_HW_NRF_UARTE0
 nrfx_uart_num = 0
@@ -101,6 +117,11 @@ rsource "Kconfig.nrfx_uart_instance"
 endif
 
 if HAS_HW_NRF_UARTE120
+
+config UART_NRFX_UARTE_USE_CLOCK_CONTROL
+	def_bool y
+	select CLOCK_CONTROL
+
 nrfx_uart_num = 120
 rsource "Kconfig.nrfx_uart_instance"
 endif

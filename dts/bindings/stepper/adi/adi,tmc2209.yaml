@@ -19,17 +19,8 @@ compatible: "adi,tmc2209"
 
 include:
   - name: stepper-controller.yaml
-    property-allowlist:
-      - micro-step-res
-      - step-gpios
-      - dir-gpios
 
 properties:
-  enable-gpios:
-    type: phandle-array
-    description: |
-      GPIO pins used to control the enable signal of the motor driver.
-
   msx-gpios:
     type: phandle-array
     description: |

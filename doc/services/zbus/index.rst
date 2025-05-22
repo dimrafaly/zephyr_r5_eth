@@ -636,6 +636,34 @@ the defined channels and observers.
     ZBUS_CHAN_DECLARE(acc_chan, version_chan);
 
 
+Unique channel identifiers
+--------------------------
+
+To simplify integrations with external entities, it is possible to assign a unique numeric identifier
+to a channel. Users can then retrieve the channel reference by using the identifier with
+:c:func:`zbus_chan_from_id`, rather than needing to obtain the reference at compile time with
+:c:macro:`ZBUS_CHAN_DECLARE`. Channels using this feature are declared with
+:c:func:`ZBUS_CHAN_DEFINE_WITH_ID`.
+
+.. code-block:: c
+
+    ZBUS_CHAN_DEFINE_WITH_ID(control_chan,    /* Name */
+        0x12345678,              /* Unique channel identifier */
+        struct control_msg,      /* Message type */
+        control_validator,       /* Validator */
+        &message_count,          /* User data */
+        ZBUS_OBSERVERS_EMPTY,    /* observers */
+        ZBUS_MSG_INIT(.move = 0) /* Initial value */
+    );
+
+    static void channel_retrieve(void)
+    {
+        const struct zbus_channel *chan = zbus_chan_from_id(0x12345678);
+
+        ...
+    }
+
+
 Iterating over channels and observers
 =====================================
 
@@ -820,13 +848,17 @@ The following code has the exact behavior of the code in :ref:`reading from a ch
 Runtime observer registration
 -----------------------------
 
-It is possible to add observers to channels in runtime. This feature uses the heap to allocate the
-nodes dynamically. The heap size limits the number of dynamic observers zbus can create. Therefore,
-set the :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS` to enable the feature. It is possible to
-adjust the heap size by changing the configuration :kconfig:option:`CONFIG_HEAP_MEM_POOL_SIZE`. The
-following example illustrates the runtime registration usage.
-
-
+It is possible to add observers to channels in runtime. Set the
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS` to enable the feature. This feature uses the heap to
+allocate the nodes dynamically, a memory slab to allocate the nodes statically, or user-provided
+nodes. It depends on the :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC`, which can be
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_DYNAMIC`,
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_STATIC`, and
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_NONE`. The dynamic is the default. When
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_STATIC` is enabled, you need to set the
+number of runtime observers you are going to use by setting the
+:kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_POOL_SIZE` configuration. The following example
+illustrates the runtime registration usage.
 
 .. code-block:: c
 
@@ -838,6 +870,12 @@ following example illustrates the runtime registration usage.
             zbus_chan_add_obs(&chan1, &my_listener, K_NO_WAIT);
             /* Removing the observer from channel chan1 */
             zbus_chan_rm_obs(&chan1, &my_listener, K_NO_WAIT);
+
+
+.. warning::
+
+  The :c:struct:`zbus_observer_node` can only be re-used in :c:func:`zbus_chan_add_obs_with_node` after removing
+  the channel observer it was first associated with through :c:func:`zbus_chan_rm_obs`.
 
 
 Samples
@@ -905,7 +943,15 @@ Related configuration options:
   a pool for the message subscriber for a set of channels;
 * :kconfig:option:`CONFIG_ZBUS_MSG_SUBSCRIBER_NET_BUF_STATIC_DATA_SIZE` the biggest message of zbus
   channels to be transported into a message buffer;
-* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS` enables the runtime observer registration.
+* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS` enables the runtime observer registration;
+* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_DYNAMIC` allocate the runtime observers
+  dynamically using the heap;
+* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_STATIC` allocate the runtime observers
+  statically using a memory slab;
+* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_POOL_SIZE` the amount of enabled runtime
+  observers to statically allocate.
+* :kconfig:option:`CONFIG_ZBUS_RUNTIME_OBSERVERS_NODE_ALLOC_NONE` use user-provided runtime
+  observers nodes;
 
 API Reference
 *************

@@ -13,6 +13,7 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/dfu/mcuboot.h>
 
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
@@ -86,7 +87,11 @@ BUILD_ASSERT(sizeof(struct image_header) == IMAGE_HEADER_SIZE,
 #define ACTIVE_IMAGE_IS 0
 #endif
 
+#if CONFIG_MCUBOOT_BOOTLOADER_MODE_FIRMWARE_UPDATER
+#define SLOTS_PER_IMAGE 1
+#else
 #define SLOTS_PER_IMAGE 2
+#endif
 
 LOG_MODULE_REGISTER(mcumgr_img_grp, CONFIG_MCUMGR_GRP_IMG_LOG_LEVEL);
 
@@ -245,8 +250,7 @@ int img_mgmt_active_image(void)
 /*
  * Reads the version and build hash from the specified image slot.
  */
-int img_mgmt_read_info(int image_slot, struct image_version *ver, uint8_t *hash,
-				   uint32_t *flags)
+int img_mgmt_read_info(int image_slot, struct image_version *ver, uint8_t *hash, uint32_t *flags)
 {
 	struct image_header hdr;
 	struct image_tlv tlv;
@@ -262,7 +266,10 @@ int img_mgmt_read_info(int image_slot, struct image_version *ver, uint8_t *hash,
 		return IMG_MGMT_ERR_FLASH_CONFIG_QUERY_FAIL;
 	}
 
-	rc = img_mgmt_read(image_slot, 0, &hdr, sizeof(hdr));
+	rc = img_mgmt_read(image_slot,
+			   boot_get_image_start_offset(img_mgmt_flash_area_id(image_slot)),
+			   &hdr, sizeof(hdr));
+
 	if (rc != 0) {
 		return rc;
 	}
@@ -290,7 +297,8 @@ int img_mgmt_read_info(int image_slot, struct image_version *ver, uint8_t *hash,
 	 * TLV. All images are required to have a hash TLV.  If the hash is missing, the image
 	 * is considered invalid.
 	 */
-	data_off = hdr.ih_hdr_size + hdr.ih_img_size;
+	data_off = hdr.ih_hdr_size + hdr.ih_img_size +
+		   boot_get_image_start_offset(img_mgmt_flash_area_id(image_slot));
 
 	rc = img_mgmt_find_tlvs(image_slot, &data_off, &data_end, IMAGE_TLV_PROT_INFO_MAGIC);
 	if (!rc) {
@@ -355,7 +363,7 @@ img_mgmt_find_by_ver(struct image_version *find, uint8_t *hash)
 	int i;
 	struct image_version ver;
 
-	for (i = 0; i < 2 * CONFIG_MCUMGR_GRP_IMG_UPDATABLE_IMAGE_NUMBER; i++) {
+	for (i = 0; i < SLOTS_PER_IMAGE * CONFIG_MCUMGR_GRP_IMG_UPDATABLE_IMAGE_NUMBER; i++) {
 		if (img_mgmt_read_info(i, &ver, hash, NULL) != 0) {
 			continue;
 		}
@@ -376,7 +384,7 @@ img_mgmt_find_by_hash(uint8_t *find, struct image_version *ver)
 	int i;
 	uint8_t hash[IMAGE_HASH_LEN];
 
-	for (i = 0; i < 2 * CONFIG_MCUMGR_GRP_IMG_UPDATABLE_IMAGE_NUMBER; i++) {
+	for (i = 0; i < SLOTS_PER_IMAGE * CONFIG_MCUMGR_GRP_IMG_UPDATABLE_IMAGE_NUMBER; i++) {
 		if (img_mgmt_read_info(i, ver, hash, NULL) != 0) {
 			continue;
 		}
@@ -1082,7 +1090,8 @@ static const struct mgmt_handler img_mgmt_handlers[] = {
 	[IMG_MGMT_ID_STATE] = {
 		.mh_read = img_mgmt_state_read,
 #if defined(CONFIG_MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP) || \
-	defined(CONFIG_MCUBOOT_BOOTLOADER_MODE_RAM_LOAD)
+	defined(CONFIG_MCUBOOT_BOOTLOADER_MODE_RAM_LOAD) || \
+	defined(CONFIG_MCUBOOT_BOOTLOADER_MODE_FIRMWARE_UPDATER)
 		.mh_write = NULL
 #else
 		.mh_write = img_mgmt_state_write,

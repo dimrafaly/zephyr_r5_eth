@@ -1,6 +1,6 @@
 # vim: set syntax=python ts=4 :
 #
-# Copyright (c) 2018-2024 Intel Corporation
+# Copyright (c) 2018-2025 Intel Corporation
 # Copyright 2022 NXP
 # SPDX-License-Identifier: Apache-2.0
 
@@ -29,6 +29,7 @@ from packaging import version
 from twisterlib.cmakecache import CMakeCache
 from twisterlib.environment import canonical_zephyr_base
 from twisterlib.error import BuildError, ConfigurationError, StatusAttributeError
+from twisterlib.log_helper import setup_logging
 from twisterlib.statuses import TwisterStatus
 
 if version.parse(elftools.__version__) < version.parse('0.24'):
@@ -42,8 +43,9 @@ from twisterlib.environment import ZEPHYR_BASE
 
 sys.path.insert(0, os.path.join(ZEPHYR_BASE, "scripts/pylib/build_helpers"))
 from domains import Domains
+from twisterlib.coverage import run_coverage_instance
 from twisterlib.environment import TwisterEnv
-from twisterlib.harness import HarnessImporter, Pytest
+from twisterlib.harness import Ctest, HarnessImporter, Pytest
 from twisterlib.log_helper import log_command
 from twisterlib.platform import Platform
 from twisterlib.testinstance import TestInstance
@@ -59,7 +61,6 @@ import expr_parser
 from anytree import Node, RenderTree
 
 logger = logging.getLogger('twister')
-logger.setLevel(logging.DEBUG)
 
 
 class ExecutionCounter:
@@ -598,10 +599,13 @@ class CMake:
                     log.write(log_msg)
 
             if log_msg:
-                overflow_found = re.findall(
-                    "region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram\\d_\\d_seg)' overflowed by",
-                    log_msg
+                pattern = (
+                    r"region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|"
+                    r"dram\d_\d_seg|iram\d_\d_seg)' "
+                    "overflowed by"
                 )
+                overflow_found = re.findall(pattern, log_msg)
+
                 imgtool_overflow_found = re.findall(
                     r"Error: Image size \(.*\) \+ trailer \(.*\) exceeds requested size",
                     log_msg
@@ -657,6 +661,9 @@ class CMake:
                 '-DCONFIG_ASSERT=y',
                 '-DCONFIG_COVERAGE=y'
             ])
+
+        if self.instance.toolchain:
+            cmake_args.append(f'-DZEPHYR_TOOLCHAIN_VARIANT={self.instance.toolchain}')
 
         # If needed, run CMake using the package_helper script first, to only run
         # a subset of all cmake modules. This output will be used to filter
@@ -830,7 +837,13 @@ class FilterBuilder(CMake):
             and self.env.options.west_flash is None
         ):
             logger.warning("Sysbuild test will be skipped. West must be used for flashing.")
-            return {os.path.join(self.platform.name, self.testsuite.name): True}
+            return {
+                os.path.join(
+                    self.platform.name,
+                    self.instance.toolchain,
+                    self.testsuite.name
+                ): True
+            }
 
         if self.testsuite and self.testsuite.filter:
             try:
@@ -846,9 +859,21 @@ class FilterBuilder(CMake):
                 raise se
 
             if not ret:
-                return {os.path.join(self.platform.name, self.testsuite.name): True}
+                return {
+                    os.path.join(
+                        self.platform.name,
+                        self.instance.toolchain,
+                        self.testsuite.name
+                    ): True
+                }
             else:
-                return {os.path.join(self.platform.name, self.testsuite.name): False}
+                return {
+                    os.path.join(
+                        self.platform.name,
+                        self.instance.toolchain,
+                        self.testsuite.name
+                    ): False
+                }
         else:
             self.platform.filter_data = filter_data
             return filter_data
@@ -953,7 +978,9 @@ class ProjectBuilder(FilterBuilder):
         additionals = {}
 
         op = message.get('op')
-
+        options = self.options
+        if not logger.handlers:
+            setup_logging(options.outdir, options.log_file, options.log_level, options.timestamps)
         self.instance.setup_handler(self.env)
 
         if op == "filter":
@@ -1106,7 +1133,7 @@ class ProjectBuilder(FilterBuilder):
                 self.instance.handler.thread = None
                 self.instance.handler.duts = None
 
-                next_op = 'report'
+                next_op = "coverage" if self.options.coverage else "report"
                 additionals = {
                     "status": self.instance.status,
                     "reason": self.instance.reason
@@ -1115,6 +1142,28 @@ class ProjectBuilder(FilterBuilder):
                 logger.error(str(sae))
                 self.instance.status = TwisterStatus.ERROR
                 reason = 'Incorrect status assignment'
+                self.instance.reason = reason
+                self.instance.add_missing_case_status(TwisterStatus.BLOCK, reason)
+                next_op = 'report'
+                additionals = {}
+            finally:
+                self._add_to_pipeline(pipeline, next_op, additionals)
+
+        # Run per-instance code coverage
+        elif op == "coverage":
+            try:
+                logger.debug(f"Run coverage for '{self.instance.name}'")
+                self.instance.coverage_status, self.instance.coverage = \
+                        run_coverage_instance(self.options, self.instance)
+                next_op = 'report'
+                additionals = {
+                    "status": self.instance.status,
+                    "reason": self.instance.reason
+                }
+            except StatusAttributeError as sae:
+                logger.error(str(sae))
+                self.instance.status = TwisterStatus.ERROR
+                reason = f"Incorrect status assignment on {op}"
                 self.instance.reason = reason
                 self.instance.add_missing_case_status(TwisterStatus.BLOCK, reason)
                 next_op = 'report'
@@ -1160,7 +1209,7 @@ class ProjectBuilder(FilterBuilder):
                     mode == "passed"
                     or (mode == "all" and self.instance.reason != "CMake build failure")
                 ):
-                    self.cleanup_artifacts()
+                    self.cleanup_artifacts(self.options.keep_artifacts)
             except StatusAttributeError as sae:
                 logger.error(str(sae))
                 self.instance.status = TwisterStatus.ERROR
@@ -1210,9 +1259,12 @@ class ProjectBuilder(FilterBuilder):
                         # The 1st capture group is new ztest suite name.
                         # The 2nd capture group is new ztest unit test name.
                         new_ztest_suite = m_[1]
-                        if new_ztest_suite not in self.instance.testsuite.ztest_suite_names:
-                            logger.warning(
-                                f"Unexpected Ztest suite '{new_ztest_suite}' "
+                        if self.trace and \
+                           new_ztest_suite not in self.instance.testsuite.ztest_suite_names:
+                            # This can happen if a ZTEST_SUITE name is macro-generated
+                            # in the test source files, e.g. based on DT information.
+                            logger.debug(
+                                f"Unexpected Ztest suite '{new_ztest_suite}' is "
                                 f"not present in: {self.instance.testsuite.ztest_suite_names}"
                             )
                         test_func_name = m_[2].replace("test_", "", 1)
@@ -1222,10 +1274,12 @@ class ProjectBuilder(FilterBuilder):
                         detected_cases.append(testcase_id)
 
         logger.debug(
-            f"Test instance {self.instance.name} already has {len(self.instance.testcases)} cases."
+            f"Test instance {self.instance.name} already has {len(self.instance.testcases)} "
+            f"testcase(s) known: {self.instance.testcases}"
         )
         if detected_cases:
-            logger.debug(f"Detected Ztest cases: [{', '.join(detected_cases)}] in {elf_file}")
+            logger.debug(f"Detected {len(detected_cases)} Ztest case(s): "
+                         f"[{', '.join(detected_cases)}] in {elf_file}")
             tc_keeper = {
                 tc.name: {'status': tc.status, 'reason': tc.reason}
                 for tc in self.instance.testcases
@@ -1261,6 +1315,8 @@ class ProjectBuilder(FilterBuilder):
             'recording.csv',
             'rom.json',
             'ram.json',
+            'build_info.yml',
+            'zephyr/zephyr.dts',
             # below ones are needed to make --test-only work as well
             'Makefile',
             'CMakeCache.txt',
@@ -1294,7 +1350,7 @@ class ProjectBuilder(FilterBuilder):
         files_to_keep = self._get_binaries()
         files_to_keep.append(os.path.join('zephyr', 'runners.yaml'))
 
-        if self.instance.sysbuild:
+        if self.instance.sysbuild and self.instance.domains:
             files_to_keep.append('domains.yaml')
             for domain in self.instance.domains.get_domains():
                 files_to_keep += self._get_artifact_allow_list_for_domain(domain.name)
@@ -1334,7 +1390,7 @@ class ProjectBuilder(FilterBuilder):
         # Get binaries for a single-domain build
         binaries += self._get_binaries_from_runners()
         # Get binaries in the case of a multiple-domain build
-        if self.instance.sysbuild:
+        if self.instance.sysbuild and self.instance.domains:
             for domain in self.instance.domains.get_domains():
                 binaries += self._get_binaries_from_runners(domain.name)
 
@@ -1497,6 +1553,15 @@ class ProjectBuilder(FilterBuilder):
             f'{TwisterStatus.get_color(instance.status)}{str.upper(instance.status)}{Fore.RESET}'
         )
 
+        def name_columns(instance, plat_width, ts_width):
+            # try to compensate for a platform name longer than plat_width
+            # by reclaiming extra spaces after the testsuite name, if any
+            plat_name = instance.platform.name
+            ts_name = instance.testsuite.name
+            plat_extra = max(0, len(plat_name) - plat_width)
+            ts_width = max(0, ts_width - plat_extra)
+            return f"{plat_name:<{plat_width}} {ts_name:<{ts_width}}"
+
         if instance.status in [TwisterStatus.ERROR, TwisterStatus.FAIL]:
             if instance.status == TwisterStatus.ERROR:
                 results.error_increment()
@@ -1506,7 +1571,7 @@ class ProjectBuilder(FilterBuilder):
                 status += " " + instance.reason
             else:
                 logger.error(
-                    f"{instance.platform.name:<25} {instance.testsuite.name:<50}"
+                    f"{name_columns(instance, 25, 50)}"
                     f" {status}: {instance.reason}"
                 )
             if not self.options.verbose:
@@ -1543,9 +1608,11 @@ class ProjectBuilder(FilterBuilder):
                      and hasattr(self.instance.handler, 'seed')
                      and self.instance.handler.seed is not None ):
                     more_info += "/seed: " + str(self.options.seed)
+                if instance.toolchain:
+                    more_info += f" <{instance.toolchain}>"
             logger.info(
                 f"{results.done - results.filtered_static:>{total_tests_width}}/{total_to_do}"
-                f" {instance.platform.name:<25} {instance.testsuite.name:<50}"
+                f" {name_columns(instance, 25, 50)}"
                 f" {status} ({more_info})"
             )
 
@@ -1608,8 +1675,8 @@ class ProjectBuilder(FilterBuilder):
                             extra_dtc_overlay_files, cmake_extra_args,
                             build_dir):
         # Retain quotes around config options
-        config_options = [arg for arg in extra_args if arg.startswith("CONFIG_")]
-        args = [arg for arg in extra_args if not arg.startswith("CONFIG_")]
+        config_options = [arg for arg in extra_args if arg.startswith(("CONFIG_", "SB_CONFIG_"))]
+        args = [arg for arg in extra_args if not arg.startswith(("CONFIG_", "SB_CONFIG_"))]
 
         args_expanded = ["-D{}".format(a.replace('"', '\"')) for a in config_options]
 
@@ -1699,8 +1766,8 @@ class ProjectBuilder(FilterBuilder):
 
             if(self.options.seed is not None and instance.platform.name.startswith("native_")):
                 self.parse_generated()
-                if('CONFIG_FAKE_ENTROPY_NATIVE_POSIX' in self.defconfig and
-                    self.defconfig['CONFIG_FAKE_ENTROPY_NATIVE_POSIX'] == 'y'):
+                if('CONFIG_FAKE_ENTROPY_NATIVE_SIM' in self.defconfig and
+                    self.defconfig['CONFIG_FAKE_ENTROPY_NATIVE_SIM'] == 'y'):
                     instance.handler.seed = self.options.seed
 
             if self.options.extra_test_args and instance.platform.arch == "posix":
@@ -1717,6 +1784,8 @@ class ProjectBuilder(FilterBuilder):
             #
             if isinstance(harness, Pytest):
                 harness.pytest_run(instance.handler.get_test_timeout())
+            elif isinstance(harness, Ctest):
+                harness.ctest_run(instance.handler.get_test_timeout())
             else:
                 instance.handler.handle(harness)
 
@@ -1733,7 +1802,6 @@ class ProjectBuilder(FilterBuilder):
             instance.metrics["used_rom"] = 0
             instance.metrics["available_rom"] = 0
             instance.metrics["available_ram"] = 0
-            instance.metrics["unrecognized"] = []
         return build_result
 
     @staticmethod
@@ -1749,13 +1817,11 @@ class ProjectBuilder(FilterBuilder):
                 instance.metrics["used_rom"] = size_calc.get_used_rom()
                 instance.metrics["available_rom"] = size_calc.get_available_rom()
                 instance.metrics["available_ram"] = size_calc.get_available_ram()
-                instance.metrics["unrecognized"] = size_calc.unrecognized_sections()
             else:
                 instance.metrics["used_ram"] = 0
                 instance.metrics["used_rom"] = 0
                 instance.metrics["available_rom"] = 0
                 instance.metrics["available_ram"] = 0
-                instance.metrics["unrecognized"] = []
             instance.metrics["handler_time"] = instance.execution_time
 
 class TwisterRunner:
@@ -1816,8 +1882,8 @@ class TwisterRunner:
                 self.results.done = self.results.total - self.results.failed
                 self.results.failed = 0
                 if self.options.retry_build_errors:
-                    self.results.error = 0
                     self.results.done -= self.results.error
+                    self.results.error = 0
             else:
                 self.results.done = self.results.filtered_static
 
@@ -1831,7 +1897,6 @@ class TwisterRunner:
                 else:
                     inst.metrics.update(self.instances[inst.name].metrics)
                     inst.metrics["handler_time"] = inst.execution_time
-                    inst.metrics["unrecognized"] = []
                     self.instances[inst.name] = inst
 
             print("")
@@ -1938,9 +2003,11 @@ class TwisterRunner:
                             pb.process(pipeline, done_queue, task, lock, results)
                             if self.env.options.quit_on_failure and \
                                 pb.instance.status in [TwisterStatus.FAIL, TwisterStatus.ERROR]:
-                                with pipeline.mutex:
-                                    pipeline.queue.clear()
-                                break
+                                try:
+                                    while True:
+                                        pipeline.get_nowait()
+                                except queue.Empty:
+                                    pass
 
                     return True
             else:
@@ -1956,12 +2023,14 @@ class TwisterRunner:
                         pb.process(pipeline, done_queue, task, lock, results)
                         if self.env.options.quit_on_failure and \
                             pb.instance.status in [TwisterStatus.FAIL, TwisterStatus.ERROR]:
-                            with pipeline.mutex:
-                                pipeline.queue.clear()
-                            break
+                            try:
+                                while True:
+                                    pipeline.get_nowait()
+                            except queue.Empty:
+                                pass
                 return True
         except Exception as e:
-            logger.error(f"General exception: {e}")
+            logger.error(f"General exception: {e}\n{traceback.format_exc()}")
             sys.exit(1)
 
     def execute(self, pipeline, done):

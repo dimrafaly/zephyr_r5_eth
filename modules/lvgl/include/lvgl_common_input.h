@@ -17,10 +17,10 @@ extern "C" {
 
 struct lvgl_common_input_config {
 	struct k_msgq *event_msgq;
+	const struct device *display_dev;
 };
 
 struct lvgl_common_input_data {
-	lv_indev_drv_t indev_drv;
 	lv_indev_t *indev;
 	lv_indev_data_t pending_event;
 	lv_indev_data_t previous_event;

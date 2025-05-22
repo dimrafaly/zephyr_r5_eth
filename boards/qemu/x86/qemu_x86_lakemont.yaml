@@ -6,7 +6,6 @@ simulation:
 arch: x86
 toolchain:
   - zephyr
-  - xtools
   - llvm
 testing:
   default: true
@@ -14,4 +13,5 @@ testing:
     - kernel
   ignore_tags:
     - benchmark
+ram: 3000
 vendor: qemu

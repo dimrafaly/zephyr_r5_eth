@@ -5,8 +5,8 @@ arch: arm
 toolchain:
   - zephyr
   - gnuarmemb
-  - xtools
 supported:
+  - adc
   - arduino_gpio
   - counter
   - dma
@@ -16,6 +16,8 @@ supported:
   - rtc
   - spi
   - watchdog
+  - usb_device
+  - usbd
 ram: 24
 flash: 128
 vendor: st

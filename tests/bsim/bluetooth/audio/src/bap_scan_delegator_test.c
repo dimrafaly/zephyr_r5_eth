@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Nordic Semiconductor ASA
+ * Copyright (c) 2021-2025 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -40,7 +40,13 @@ CREATE_FLAG(flag_broadcast_code_received);
 CREATE_FLAG(flag_recv_state_updated);
 CREATE_FLAG(flag_bis_sync_requested);
 CREATE_FLAG(flag_bis_sync_term_requested);
+CREATE_FLAG(flag_broadcast_source_added);
+CREATE_FLAG(flag_broadcast_source_modified);
+CREATE_FLAG(flag_broadcast_source_removed);
+CREATE_FLAG(flag_remove_source_rejected);
+
 static volatile uint32_t g_broadcast_id;
+static bool reject_control_op;
 
 struct sync_state {
 	uint8_t src_id;
@@ -240,6 +246,13 @@ static void recv_state_updated_cb(struct bt_conn *conn,
 	SET_FLAG(flag_recv_state_updated);
 }
 
+static void reset_cp_flags(void)
+{
+	UNSET_FLAG(flag_broadcast_source_added);
+	UNSET_FLAG(flag_broadcast_source_modified);
+	UNSET_FLAG(flag_broadcast_source_removed);
+}
+
 static int pa_sync_req_cb(struct bt_conn *conn,
 			  const struct bt_bap_scan_delegator_recv_state *recv_state,
 			  bool past_avail, uint16_t pa_interval)
@@ -247,6 +260,7 @@ static int pa_sync_req_cb(struct bt_conn *conn,
 	struct sync_state *state;
 	int err;
 
+	reset_cp_flags();
 	printk("PA Sync request: past_avail %u, pa_interval 0x%04x\n: %p",
 	       past_avail, pa_interval, recv_state);
 
@@ -351,12 +365,44 @@ static int bis_sync_req_cb(struct bt_conn *conn,
 	return 0;
 }
 
+static int add_source_cb(struct bt_conn *conn,
+	const struct bt_bap_scan_delegator_recv_state *recv_state)
+{
+	printk("Add Source callback: src_id=%u\n", recv_state->src_id);
+	SET_FLAG(flag_broadcast_source_added);
+	return 0;
+}
+
+static int modify_source_cb(struct bt_conn *conn,
+	   const struct bt_bap_scan_delegator_recv_state *recv_state)
+{
+	printk("Modify Source callback: src_id=%u\n", recv_state->src_id);
+	SET_FLAG(flag_broadcast_source_modified);
+	return 0;
+}
+
+static int remove_source_cb(struct bt_conn *conn, uint8_t src_id)
+{
+	printk("Remove Source callback: src_id=%u\n", src_id);
+
+	if (reject_control_op) {
+		SET_FLAG(flag_remove_source_rejected);
+		return BT_ATT_ERR_WRITE_REQ_REJECTED;
+	}
+
+	SET_FLAG(flag_broadcast_source_removed);
+	return 0;
+}
+
 static struct bt_bap_scan_delegator_cb scan_delegator_cb = {
 	.recv_state_updated = recv_state_updated_cb,
 	.pa_sync_req = pa_sync_req_cb,
 	.pa_sync_term_req = pa_sync_term_req_cb,
 	.broadcast_code = broadcast_code_cb,
 	.bis_sync_req = bis_sync_req_cb,
+	.add_source = add_source_cb,
+	.modify_source = modify_source_cb,
+	.remove_source = remove_source_cb
 };
 
 static void pa_synced_cb(struct bt_le_per_adv_sync *sync,
@@ -648,17 +694,18 @@ static void remove_all_sources(void)
 static int sync_broadcast(struct sync_state *state)
 {
 	int err;
-	uint32_t bis_sync[CONFIG_BT_BAP_BASS_MAX_SUBGROUPS];
 
 	UNSET_FLAG(flag_recv_state_updated);
 
-	for (size_t i = 0U; i < CONFIG_BT_BAP_BASS_MAX_SUBGROUPS; i++) {
-		bis_sync[i] = BT_ISO_BIS_INDEX_BIT(i + 1);
+	if (!TEST_FLAG(flag_bis_sync_requested)) {
+		/* If we have not received a sync request, set a value ourselves */
+		for (size_t i = 0U; i < ARRAY_SIZE(state->bis_sync_req); i++) {
+			state->bis_sync_req[i] = BIT(i);
+		}
 	}
 
 	/* We don't actually need to sync to the BIG/BISes */
-	err = bt_bap_scan_delegator_set_bis_sync_state(state->src_id, bis_sync);
-
+	err = bt_bap_scan_delegator_set_bis_sync_state(state->src_id, state->bis_sync_req);
 	if (err) {
 		return err;
 	}
@@ -691,6 +738,7 @@ static void sync_all_broadcasts(void)
 
 static int common_init(void)
 {
+	struct bt_le_ext_adv *ext_adv;
 	int err;
 
 	err = bt_enable(NULL);
@@ -709,13 +757,7 @@ static int common_init(void)
 
 	bt_le_per_adv_sync_cb_register(&pa_sync_cb);
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, AD_SIZE, NULL, 0);
-	if (err) {
-		FAIL("Advertising failed to start (err %d)\n", err);
-		return err;
-	}
-
-	printk("Advertising successfully started\n");
+	setup_connectable_adv(&ext_adv);
 
 	WAIT_FOR_FLAG(flag_connected);
 
@@ -732,24 +774,31 @@ static void test_main_client_sync(void)
 		return;
 	}
 
+	WAIT_FOR_FLAG(flag_broadcast_source_added);
 	/* Wait for broadcast assistant to request us to sync to PA */
+	printk("Waiting for flag_pa_synced\n");
 	WAIT_FOR_FLAG(flag_pa_synced);
-
-	/* Wait for broadcast assistant to send us broadcast code */
-	WAIT_FOR_FLAG(flag_broadcast_code_received);
 
 	/* Mod all sources by modifying the metadata */
 	mod_all_sources();
 
+	WAIT_FOR_FLAG(flag_broadcast_source_modified);
 	/* Wait for broadcast assistant to tell us to BIS sync */
+	printk("Waiting for flag_bis_sync_requested\n");
 	WAIT_FOR_FLAG(flag_bis_sync_requested);
 
 	/* Set the BIS sync state */
 	sync_all_broadcasts();
 
+	/* Wait for broadcast assistant to send us broadcast code */
+	printk("Waiting for flag_broadcast_code_received\n");
+	WAIT_FOR_FLAG(flag_broadcast_code_received);
+
 	/* Wait for broadcast assistant to remove source and terminate PA sync */
+	printk("Waiting for flag_pa_terminated\n");
 	WAIT_FOR_FLAG(flag_pa_terminated);
 
+	WAIT_FOR_FLAG(flag_broadcast_source_removed);
 	PASS("BAP Scan Delegator Client Sync passed\n");
 }
 
@@ -772,12 +821,14 @@ static void test_main_server_sync_client_rem(void)
 	}
 
 	/* Wait for PA to sync */
+	printk("Waiting for flag_pa_synced\n");
 	WAIT_FOR_FLAG(flag_pa_synced);
 
 	/* Add PAs as receive state sources */
 	add_all_sources();
 
 	/* Wait for broadcast assistant to send us broadcast code */
+	printk("Waiting for flag_broadcast_code_received\n");
 	WAIT_FOR_FLAG(flag_broadcast_code_received);
 
 	/* Mod all sources by modifying the metadata */
@@ -786,7 +837,15 @@ static void test_main_server_sync_client_rem(void)
 	/* Set the BIS sync state */
 	sync_all_broadcasts();
 
+	/* Enable rejection for the first remove source request */
+	reject_control_op = true;
+
+	WAIT_FOR_FLAG(flag_remove_source_rejected);
+
+	/* Disable rejection for subsequent remove source requests */
+	reject_control_op = false;
 	/* For for client to remove source and thus terminate the PA */
+	printk("Waiting for flag_pa_terminated\n");
 	WAIT_FOR_FLAG(flag_pa_terminated);
 
 	PASS("BAP Scan Delegator Server Sync Client Remove passed\n");
@@ -811,12 +870,14 @@ static void test_main_server_sync_server_rem(void)
 	}
 
 	/* Wait for PA to sync */
+	printk("Waiting for flag_pa_synced\n");
 	WAIT_FOR_FLAG(flag_pa_synced);
 
 	/* Add PAs as receive state sources */
 	add_all_sources();
 
 	/* Wait for broadcast assistant to send us broadcast code */
+	printk("Waiting for flag_broadcast_code_received\n");
 	WAIT_FOR_FLAG(flag_broadcast_code_received);
 
 	/* Mod all sources by modifying the metadata */
@@ -829,6 +890,7 @@ static void test_main_server_sync_server_rem(void)
 	remove_all_sources();
 
 	/* Wait for PA sync to be terminated */
+	printk("Waiting for flag_pa_terminated\n");
 	WAIT_FOR_FLAG(flag_pa_terminated);
 
 	PASS("BAP Scan Delegator Server Sync Server Remove passed\n");

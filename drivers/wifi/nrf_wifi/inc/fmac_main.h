@@ -27,9 +27,11 @@
 #ifdef CONFIG_NRF70_STA_MODE
 #include <drivers/driver_zephyr.h>
 #endif /* CONFIG_NRF70_STA_MODE */
+#include <system/fmac_api.h>
+#else
+#include <radio_test/fmac_api.h>
 #endif /* !CONFIG_NRF70_RADIO_TEST */
 
-#include <fmac_api.h>
 #include <host_rpu_umac_if.h>
 
 #define NRF70_DRIVER_VERSION "1."KERNEL_VERSION_STRING
@@ -83,6 +85,7 @@ struct nrf_wifi_vif_ctx_zep {
 #endif /* CONFIG_NRF70_AP_MODE */
 #ifdef CONFIG_NRF_WIFI_RPU_RECOVERY
 	struct k_work nrf_wifi_rpu_recovery_work;
+	struct k_work_delayable nrf_wifi_rpu_recovery_bringup_work;
 #endif /* CONFIG_NRF_WIFI_RPU_RECOVERY */
 	int rts_threshold_value;
 };

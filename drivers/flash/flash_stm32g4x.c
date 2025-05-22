@@ -246,7 +246,7 @@ int flash_stm32_write_range(const struct device *dev, unsigned int offset,
 	int i, rc = 0;
 
 	for (i = 0; i < len; i += 8, offset += 8) {
-		rc = write_dword(dev, offset, ((const uint64_t *) data)[i>>3]);
+		rc = write_dword(dev, offset, UNALIGNED_GET((const uint64_t *) data + (i>>3)));
 		if (rc < 0) {
 			return rc;
 		}
@@ -285,7 +285,10 @@ int flash_stm32_option_bytes_write(const struct device *dev, uint32_t mask,
 		return rc;
 	}
 
-	return 0;
+	/* Force the option byte loading */
+	regs->CR |= FLASH_CR_OBL_LAUNCH;
+
+	return flash_stm32_wait_flash_idle(dev);
 }
 
 uint32_t flash_stm32_option_bytes_read(const struct device *dev)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Renesas Electronics Corporation
+ * Copyright (c) 2024-2025 Renesas Electronics Corporation
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -13,8 +13,13 @@
 /delete-node/ &agt3;
 /delete-node/ &agt4;
 /delete-node/ &agt5;
+/delete-node/ &iic0;
+/delete-node/ &iic1;
+/delete-node/ &usbfs;
+/delete-node/ &usbfs_phy;
 
 /delete-node/ &adc1;
+/delete-node/ &dac1;
 
 / {
 	soc {
@@ -34,17 +39,29 @@
 		};
 
 		flash-controller@407e0000 {
-			reg = <0x407e0000 0x10000>;
-			#address-cells = <1>;
-			#size-cells = <1>;
+			flash-hardware-version = <40>;
+			#erase-block-cells = <2>;
+
 			flash0: flash@0 {
-				compatible = "soc-nv-flash";
+				compatible = "renesas,ra-nv-code-flash";
 				reg = <0x0 DT_SIZE_K(128)>;
+				write-block-size = <128>;
+				erase-block-size = <32768>;
+				erase-blocks = <&flash 8 8192>, <&flash 2 32768>;
+				programming-enable;
+			};
+
+			flash1: flash@8000000 {
+				compatible = "renesas,ra-nv-data-flash";
+				reg = <0x8000000 DT_SIZE_K(4)>;
+				write-block-size = <4>;
+				erase-block-size = <64>;
+				programming-enable;
+				erase-value-undefined;
 			};
 		};
 
 		adc@40170000 {
-			channel-count = <12>;
 			channel-available-mask = <0x139f7>;
 		};
 
@@ -61,6 +78,7 @@
 			interrupt-names = "rxf", "glerr";
 			clocks = <&pclkb 0 0>, <&pclka 0 0>;
 			clock-names = "opclk", "ramclk";
+			dll-max-freq = <DT_FREQ_M(40)>;
 			reg = <0x400b0000 0x2000>;
 			status = "disabled";
 
@@ -73,6 +91,11 @@
 				clock-names = "dllclk";
 				status = "disabled";
 			};
+		};
+
+		trng: trng {
+			compatible = "renesas,ra-trng";
+			status = "disabled";
 		};
 	};
 
@@ -135,6 +158,7 @@
 
 			iclk: iclk {
 				compatible = "renesas,ra-cgc-pclk";
+				clock-frequency = <100000000>;
 				div = <2>;
 				#clock-cells = <2>;
 				status = "okay";
@@ -289,4 +313,8 @@
 	port-irqs = <&port_irq11>;
 	port-irq-names = "port-irq11";
 	port-irq11-pins = <14>;
+};
+
+&dac_global {
+	has-output-amplifier;
 };

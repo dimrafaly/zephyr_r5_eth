@@ -57,7 +57,7 @@
 #elif defined(CONFIG_SPARC)
 #elif defined(CONFIG_MIPS)
 #elif defined(CONFIG_ARCH_POSIX)
-#if defined(CONFIG_BOARD_NATIVE_POSIX) || defined(CONFIG_BOARD_NATIVE_SIM)
+#if defined(CONFIG_BOARD_NATIVE_SIM)
 #define TICK_IRQ TIMER_TICK_IRQ
 #else
 /*
@@ -72,10 +72,10 @@ extern const int32_t z_sys_timer_irq_for_test;
 
 #endif
 
-/* Cortex-M1 and Nios II do have a power saving instruction, so k_cpu_idle()
+/* Cortex-M1 does have a power saving instruction, so k_cpu_idle()
  * returns immediately
  */
-#if !defined(CONFIG_CPU_CORTEX_M1) && !defined(CONFIG_NIOS2)
+#if !defined(CONFIG_CPU_CORTEX_M1)
 #define HAS_POWERSAVE_INSTRUCTION
 #endif
 
@@ -135,7 +135,7 @@ static void isr_handler(const void *data)
 			break;
 		}
 
-		if (arch_current_thread()->base.prio < 0) {
+		if (_current->base.prio < 0) {
 			isr_info.value = K_COOP_THREAD;
 			break;
 		}
@@ -643,9 +643,9 @@ ZTEST(context, test_ctx_thread)
 	TC_PRINT("Testing k_is_in_isr() from a preemptible thread\n");
 	zassert_false(k_is_in_isr(), "Should not be in ISR context");
 
-	zassert_false(arch_current_thread()->base.prio < 0,
+	zassert_false(_current->base.prio < 0,
 		      "Current thread should have preemptible priority: %d",
-		      arch_current_thread()->base.prio);
+		      _current->base.prio);
 
 }
 
@@ -683,7 +683,7 @@ static void _test_kernel_thread(k_tid_t _thread_id)
 
 	zassert_false(k_is_in_isr(), "k_is_in_isr() when called from a thread is true");
 
-	zassert_false((arch_current_thread()->base.prio >= 0),
+	zassert_false((_current->base.prio >= 0),
 		      "thread is not a cooperative thread");
 }
 
@@ -845,13 +845,10 @@ static void busy_wait_thread(void *mseconds, void *arg2, void *arg3)
 
 	k_busy_wait(usecs);
 
-	/* FIXME: Broken on Nios II, see #22956 */
-#ifndef CONFIG_NIOS2
 	int key = arch_irq_lock();
 
 	k_busy_wait(usecs);
 	arch_irq_unlock(key);
-#endif
 
 	/*
 	 * Ideally the test should verify that the correct number of ticks

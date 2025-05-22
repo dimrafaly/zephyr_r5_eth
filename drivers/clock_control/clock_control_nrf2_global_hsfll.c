@@ -101,7 +101,7 @@ static int api_request_global_hsfll(const struct device *dev,
 	struct onoff_manager *mgr = global_hsfll_find_mgr(dev, spec);
 
 	if (mgr) {
-		return onoff_request(mgr, cli);
+		return clock_config_request(mgr, cli);
 	}
 
 	return -EINVAL;
@@ -132,7 +132,7 @@ static int api_cancel_or_release_global_hsfll(const struct device *dev,
 	return -EINVAL;
 }
 
-static struct nrf_clock_control_driver_api driver_api = {
+static DEVICE_API(nrf_clock_control, driver_api) = {
 	.std_api = {
 		.on = api_nosys_on_off,
 		.off = api_nosys_on_off,

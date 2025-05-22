@@ -19,6 +19,7 @@ config SOC_SERIES_RW6XX
 	select HAS_PM
 	select HAS_NXP_MONOLITHIC_NBU
 	select SOC_EARLY_INIT_HOOK
+	select HAS_SEGGER_RTT if ZEPHYR_SEGGER_MODULE
 
 if SOC_SERIES_RW6XX
 
@@ -53,5 +54,10 @@ endif # NXP_RW6XX_BOOT_HEADER
 
 rsource "../common/Kconfig.flexspi_xip"
 rsource "../common/Kconfig.nbu"
+
+config XTAL32K
+	bool "Use the External 32K clock"
+	help
+	  This clock is used by certain peripherals such as RTC.
 
 endif # SOC_SERIES_RW6XX

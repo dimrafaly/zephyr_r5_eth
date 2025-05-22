@@ -164,7 +164,7 @@ static int cmd_set_brightness(const struct shell *sh,
 			     argv[arg_idx_value]);
 		return -EINVAL;
 	}
-	if (value > 100) {
+	if (value > LED_BRIGTHNESS_MAX) {
 		shell_error(sh, "Invalid LED brightness value %lu (max 100)",
 			    value);
 		return -EINVAL;
@@ -330,14 +330,14 @@ cmd_write_channels(const struct shell *sh, size_t argc, char **argv)
 	return err;
 }
 
-static bool device_is_led_and_ready(const struct device *dev)
+static bool device_is_led(const struct device *dev)
 {
-	return device_is_ready(dev) && DEVICE_API_IS(led, dev);
+	return DEVICE_API_IS(led, dev);
 }
 
 static void device_name_get(size_t idx, struct shell_static_entry *entry)
 {
-	const struct device *dev = shell_device_filter(idx, device_is_led_and_ready);
+	const struct device *dev = shell_device_filter(idx, device_is_led);
 
 	entry->syntax = (dev != NULL) ? dev->name : NULL;
 	entry->handler = NULL;

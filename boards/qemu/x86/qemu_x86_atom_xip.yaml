@@ -6,9 +6,10 @@ simulation:
   - name: qemu
 toolchain:
   - zephyr
-  - xtools
 testing:
   default: true
   only_tags:
     - xip
+    - llext
+ram: 3000
 vendor: qemu
