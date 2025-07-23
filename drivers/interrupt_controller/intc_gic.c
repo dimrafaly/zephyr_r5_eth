@@ -47,6 +47,9 @@ static const irq_config_t active_irqs[] = {
     {65, 0x01}, // ipi channel1 RPU0
     {68, 0x01}, // TTC0  channel0 RPU0
     {89, 0x01}, // GEM0 RPU0
+    {90, 0x01}, // GEM0 wakup RPU0
+    {48, 0x01}, // GPIO
+    {55, 0x01}, // CAN0
 };
 
 void arm_gic_irq_enable(unsigned int irq)
