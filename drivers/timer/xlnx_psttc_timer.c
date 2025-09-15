@@ -13,13 +13,24 @@
 #include <zephyr/sys_clock.h>
 #include <soc.h>
 #include <zephyr/drivers/timer/system_timer.h>
+#include <zephyr/logging/log.h>
+
 #include "xlnx_psttc_timer_priv.h"
+LOG_MODULE_REGISTER(xlnx_ttcps);
 
-#define TIMER_INDEX		CONFIG_XLNX_PSTTC_TIMER_INDEX
+#if CONFIG_XLNX_PSTTC_TIMER_INDEX == 0
+# define TIMER_NODE DT_NODELABEL(ttc0)
+#elif CONFIG_XLNX_PSTTC_TIMER_INDEX == 1
+# define TIMER_NODE DT_NODELABEL(ttc1)
+#elif CONFIG_XLNX_PSTTC_TIMER_INDEX == 2
+# define TIMER_NODE DT_NODELABEL(ttc2)
+#else
+# error "Unsupported CONFIG_XLNX_PSTTC_TIMER_INDEX"
+#endif
 
-#define TIMER_IRQ		DT_INST_IRQN(0)
-#define TIMER_BASE_ADDR		DT_INST_REG_ADDR(0)
-#define TIMER_CLOCK_FREQUECY	DT_INST_PROP(0, clock_frequency)
+#define TIMER_IRQ		DT_IRQN(TIMER_NODE)
+#define TIMER_BASE_ADDR		DT_REG_ADDR(TIMER_NODE)
+#define TIMER_CLOCK_FREQUECY	DT_PROP(TIMER_NODE, clock_frequency)
 
 #define TICKS_PER_SEC		CONFIG_SYS_CLOCK_TICKS_PER_SEC
 #define CYCLES_PER_SEC		TIMER_CLOCK_FREQUECY
@@ -199,6 +210,7 @@ static int sys_clock_driver_init(void)
 	reg_val &= (~XTTCPS_CNT_CNTRL_DIS_MASK);
 	sys_write32(reg_val, TIMER_BASE_ADDR + XTTCPS_CNT_CNTRL_OFFSET);
 
+	LOG_INF("Timer Base Addr 0x%x\n", TIMER_BASE_ADDR);
 	return 0;
 }
 
