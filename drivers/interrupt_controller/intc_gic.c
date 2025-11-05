@@ -42,7 +42,7 @@ typedef struct {
 static const irq_config_t active_irqs[] = {
     {53, 0x02}, // UART0 RPU1
 	{66, 0x02}, // ipi chanel2 RPU1
-    {69, 0x02}, // TTC0 channel1 RPU1
+    {71, 0x02}, // TTC1 channel1 RPU1
     {53, 0x01}, // UART0 RPU0
     {65, 0x01}, // ipi channel1 RPU0
     {68, 0x01}, // TTC0  channel0 RPU0
