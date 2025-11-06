@@ -482,6 +482,11 @@ static int net_context_check(sa_family_t family, enum net_sock_type type,
 			NET_DBG("AF_PACKET disabled");
 			return -EPFNOSUPPORT;
 		}
+		if (!IS_ENABLED(CONFIG_NET_SOCKETS_PACKET_DGRAM) &&
+		    type == SOCK_DGRAM) {
+			NET_DBG("DGRAM socket type disabled.");
+			return -EPROTOTYPE;
+		}
 		if (type != SOCK_RAW && type != SOCK_DGRAM) {
 			NET_DBG("AF_PACKET only supports RAW and DGRAM socket "
 				"types.");
@@ -629,6 +634,13 @@ int net_context_get(sa_family_t family, enum net_sock_type type, uint16_t proto,
 	k_sem_give(&contexts_lock);
 
 	if (ret < 0) {
+		if (ret == -EADDRINUSE &&
+		    !net_if_is_ip_offloaded(net_if_get_default()) &&
+		    proto == IPPROTO_TCP) {
+			/* Free the TCP context that we allocated earlier */
+			net_tcp_put(&contexts[i]);
+		}
+
 		return ret;
 	}
 

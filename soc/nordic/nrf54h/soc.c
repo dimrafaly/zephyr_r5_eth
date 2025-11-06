@@ -22,7 +22,10 @@
 #include <soc/nrfx_coredep.h>
 #include <soc_lrcconf.h>
 #include <dmm.h>
-#include <zephyr/drivers/firmware/nrf_ironside/cpuconf.h>
+
+#if defined(CONFIG_SOC_NRF54H20_CPURAD_ENABLE)
+#include <nrf_ironside/cpuconf.h>
+#endif
 
 LOG_MODULE_REGISTER(soc, CONFIG_SOC_LOG_LEVEL);
 
@@ -153,7 +156,9 @@ void soc_early_init_hook(void)
 	nrf_spu_periph_perm_dmasec_set(spu, nrf_address_slave_get(ccm030_addr), true);
 #endif
 
-	if (DT_NODE_HAS_STATUS(DT_NODELABEL(nfct), disabled) &&
+	if (((IS_ENABLED(CONFIG_SOC_NRF54H20_CPUAPP) &&
+	      DT_NODE_HAS_STATUS(DT_NODELABEL(nfct), disabled)) ||
+	     DT_NODE_HAS_STATUS(DT_NODELABEL(nfct), reserved)) &&
 	    DT_PROP_OR(DT_NODELABEL(nfct), nfct_pins_as_gpios, 0)) {
 		nrf_nfct_pad_config_enable_set(NRF_NFCT, false);
 	}
@@ -173,7 +178,8 @@ void soc_late_init_hook(void)
 
 	void *radiocore_address =
 		(void *)(DT_REG_ADDR(DT_GPARENT(DT_NODELABEL_CPURAD_SLOT0_PARTITION)) +
-				 DT_REG_ADDR(DT_NODELABEL_CPURAD_SLOT0_PARTITION));
+			 DT_REG_ADDR(DT_NODELABEL_CPURAD_SLOT0_PARTITION) +
+			 CONFIG_ROM_START_OFFSET);
 
 	/* Don't wait as this is not yet supported. */
 	bool cpu_wait = false;

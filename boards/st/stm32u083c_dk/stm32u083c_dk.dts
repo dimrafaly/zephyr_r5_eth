@@ -27,6 +27,7 @@
 
 	leds: leds {
 		compatible = "gpio-leds";
+
 		green_led_1: led_3 {
 			gpios = <&gpioc 13 GPIO_ACTIVE_HIGH>;
 			label = "User LD3";
@@ -133,6 +134,12 @@
 	};
 };
 
+stm32_lp_tick_source: &lptim2 {
+	clocks = <&rcc STM32_CLOCK(APB1, 30)>,
+		<&rcc STM32_SRC_LSI LPTIM2_SEL(1)>;
+	status = "okay";
+};
+
 &tsc {
 	status = "okay";
 	pinctrl-0 = <&tsc_g1_io1_pb12 &tsc_g1_io2_pb13 &tsc_g6_io1_pd10 &tsc_g6_io2_pd11>;
@@ -157,6 +164,7 @@
 		group = <6>;
 		channel-ios = <TSC_IO2>;
 		sampling-io = <TSC_IO1>;
+
 		ts1 {
 			compatible = "tsc-keys";
 			sampling-interval-ms = <10>;

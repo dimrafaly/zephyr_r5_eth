@@ -428,6 +428,8 @@ endmacro()
 
 # Constructor with a directory-inferred name
 macro(zephyr_library)
+  zephyr_check_no_arguments(zephyr_library ${ARGN})
+
   zephyr_library_get_current_dir_lib_name(${ZEPHYR_BASE} lib_name)
   zephyr_library_named(${lib_name})
 endmacro()
@@ -452,6 +454,8 @@ endmacro()
 
 # Constructor with an explicitly given name.
 macro(zephyr_library_named name)
+  zephyr_check_no_arguments(zephyr_library_named ${ARGN})
+
   # This is a macro because we need add_library() to be executed
   # within the scope of the caller.
   set(ZEPHYR_CURRENT_LIBRARY ${name})
@@ -585,7 +589,7 @@ endfunction()
 # constructor but must be called explicitly on CMake libraries that do
 # not use a zephyr library constructor.
 function(zephyr_append_cmake_library library)
-  if(TARGET zephyr_prebuilt)
+  if(TARGET zephyr_pre0)
     message(WARNING
       "zephyr_library() or zephyr_library_named() called in Zephyr CMake "
       "application mode. `${library}` will not be treated as a Zephyr library."
@@ -5167,6 +5171,10 @@ endfunction()
 #                       the given passes. Empty list means no passes.
 #                       PASS NOT [<p1>] [<p2>...] makes the section present in
 #                       all but the given passes. Empty list means all passes.
+# TYPE <type>         : Tag section for special treatment.
+#                       NOLOAD, BSS - Ensure that the section is NOLOAD
+#                       LINKER_SCRIPT_FOOTER - One single section to be
+#                                              generated last
 # Note: VMA and LMA are mutual exclusive with GROUP
 #
 function(zephyr_linker_section)
@@ -5284,6 +5292,7 @@ function(zephyr_iterable_section)
   set(options     "ALIGN_WITH_INPUT;NUMERIC")
   set(single_args "GROUP;LMA;NAME;SUBALIGN;VMA")
   set(multi_args  "")
+  set(subalign "")
   set(align_input)
   cmake_parse_arguments(SECTION "${options}" "${single_args}" "${multi_args}" ${ARGN})
 
@@ -5293,10 +5302,8 @@ function(zephyr_iterable_section)
     )
   endif()
 
-  if(NOT DEFINED SECTION_SUBALIGN)
-    message(FATAL_ERROR "zephyr_iterable_section(${ARGV0} ...) missing "
-                        "required argument: SUBALIGN"
-    )
+  if(DEFINED SECTION_SUBALIGN)
+    set(subalign "SUBALIGN ${SECTION_SUBALIGN}")
   endif()
 
   if(SECTION_ALIGN_WITH_INPUT)
@@ -5317,7 +5324,7 @@ function(zephyr_iterable_section)
     NAME ${SECTION_NAME}_area
     GROUP "${SECTION_GROUP}"
     VMA "${SECTION_VMA}" LMA "${SECTION_LMA}"
-    NOINPUT ${align_input} SUBALIGN ${SECTION_SUBALIGN}
+    NOINPUT ${align_input} ${subalign}
   )
   zephyr_linker_section_configure(
     SECTION ${SECTION_NAME}_area
@@ -5736,6 +5743,20 @@ macro(zephyr_check_flags_exclusive function prefix)
   endif()
 endmacro()
 
+#
+# Helper macro for verifying that no unexpected arguments are provided.
+#
+# A FATAL_ERROR will be raised if any unexpected argument is given.
+#
+# Usage:
+#   zephyr_check_no_arguments(<function_name> ${ARGN})
+#
+macro(zephyr_check_no_arguments function)
+  if(${ARGC} GREATER 1)
+    message(FATAL_ERROR "${function} called with unexpected argument(s): ${ARGN}")
+  endif()
+endmacro()
+
 ########################################################
 # 7. Linkable loadable extensions (llext)
 ########################################################
@@ -5951,11 +5972,13 @@ function(add_llext_target target_name)
             $<TARGET_PROPERTY:bintools,elfconvert_flag>
             $<TARGET_PROPERTY:bintools,elfconvert_flag_strip_unneeded>
             $<TARGET_PROPERTY:bintools,elfconvert_flag_section_remove>.xt.*
+            $<TARGET_PROPERTY:bintools,elfconvert_flag_section_remove>.xtensa.info
             $<TARGET_PROPERTY:bintools,elfconvert_flag_infile>${llext_pkg_input}
             $<TARGET_PROPERTY:bintools,elfconvert_flag_outfile>${llext_pkg_output}
             $<TARGET_PROPERTY:bintools,elfconvert_flag_final>
     COMMAND ${slid_inject_cmd}
     DEPENDS ${llext_proc_target} ${llext_pkg_input}
+    COMMAND_EXPAND_LISTS
   )
 
   # Add user-visible target and dependency, and fill in properties
