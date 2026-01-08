@@ -34,6 +34,9 @@ static const uint64_t cpu_mpid_list[] = {
 BUILD_ASSERT(ARRAY_SIZE(cpu_mpid_list) >= CONFIG_MP_MAX_NUM_CPUS,
 		"The count of CPU Cores nodes in dts is less than CONFIG_MP_MAX_NUM_CPUS\n");
 
+BUILD_ASSERT(ARRAY_SIZE(cpu_mpid_list) == 1,
+		"More than one cpu initialized\n");
+
 typedef struct {
     unsigned int irq;       // The IRQ number
     uint8_t cpu_mask;       // The CPU mask associated with this IRQ
@@ -41,9 +44,12 @@ typedef struct {
 
 static const irq_config_t active_irqs[] = {
     {53, 0x02}, // UART0 RPU1
+    {54, 0x02}, // UART1 RPU1
 	{66, 0x02}, // ipi chanel2 RPU1
     {71, 0x02}, // TTC1 channel1 RPU1
+    {122, 0x02},// PL-PS irq channel1 RPU1
     {53, 0x01}, // UART0 RPU0
+    {54, 0x01}, // UART1 RPU0
     {65, 0x01}, // ipi channel1 RPU0
     {68, 0x01}, // TTC0  channel0 RPU0
     {89, 0x01}, // GEM0 RPU0
@@ -196,76 +202,63 @@ void gic_raise_sgi(unsigned int sgi_id, uint64_t target_aff,
 
 static void gic_dist_init(void)
 {
-	unsigned int gic_irqs = 195U, i;
-	uint8_t cpu_mask = 0;
-	uint32_t reg_val;
+    unsigned int gic_irqs, i;
+    uint64_t my_mpid = read_mpidr() & 0xff; // current CPU
+    uint32_t reg_val;
 
-	// gic_irqs = sys_read32(GICD_TYPER) & 0x1f;
-	// gic_irqs = (gic_irqs + 1) * 32;
-	// if (gic_irqs > 1020) {
-	// 	gic_irqs = 1020;
-	// }
-	if (cpu_mpid_list[0] == 0)
-		return;
-	/*
-	 * Disable the forwarding of pending interrupts
-	 * from the Distributor to the CPU interfaces
-	 */
-	sys_write32(0, GICD_CTLR);
+    /* Determine number of interrupts from GICD_TYPER */
+    gic_irqs = sys_read32(GICD_TYPER) & 0x1f;
+    gic_irqs = (gic_irqs + 1) * 32;
+    if (gic_irqs > 1020U)
+        gic_irqs = 1020U;
 
-	/*
-	 * Enable selected global interrupts distributing to CPUs listed
-	 * in dts with the count of arch_num_cpus().
-	 */
-	// unsigned int num_cpus = arch_num_cpus();
+    /* Disable Distributor temporarily */
+    sys_write32(0, GICD_CTLR);
 
+    for (i = 0; i < ARRAY_SIZE(active_irqs); i++) {
+        unsigned int irq = active_irqs[i].irq;
+        uint8_t cpu_mask = active_irqs[i].cpu_mask & 0xff;
 
-	for (i = 0; i < (sizeof(active_irqs) / sizeof(active_irqs[0])); i++) {
-		unsigned int irq = active_irqs[i].irq;
-		cpu_mask = active_irqs[i].cpu_mask;
+        /* Only SPIs */
+        if (irq < GIC_SPI_INT_BASE)
+            continue;
 
-		uint32_t reg_offset = (irq / 4) * 4;   // Each register holds 4 interrupts
-		uint8_t byte_offset = irq % 4;         // Select the correct byte within the register
+        /* Only interrupts targeting this CPU */
+        if ((1ULL << my_mpid) != cpu_mask)
+            continue;
 
-		reg_val = sys_read32(GICD_ITARGETSRn + reg_offset);
-		reg_val |= (cpu_mask << (byte_offset * 8));  // Set CPU mask for the specific IRQ
+        /* ITARGETSR: 1 byte per IRQ */
+        uint32_t reg_base = GICD_ITARGETSRn + (irq & ~0x3);
+        uint8_t byte_off = irq & 0x3;
+        reg_val = sys_read32(reg_base);
+        reg_val &= ~(0xffU << (byte_off * 8));
+        reg_val |= ((uint32_t)cpu_mask << (byte_off * 8));
+        sys_write32(reg_val, reg_base);
 
-		sys_write32(reg_val, GICD_ITARGETSRn + reg_offset);
-	}
+        /* Priority: default 0xA0 */
+        sys_write8(0xA0, GICD_IPRIORITYRn + irq);
 
-	/*
-	 * Set all global interrupts to be level triggered, active low.
-	 */
-	for (i = GIC_SPI_INT_BASE; i < gic_irqs; i += 16) {
-		sys_write32(0, GICD_ICFGRn + i / 4);
-	}
+        /* Level-sensitive, active low */
+        uint32_t cfg_reg = GICD_ICFGRn + ((irq / 16) * 4);
+        reg_val = sys_read32(cfg_reg);
+        reg_val &= ~(0x3U << ((irq % 16) * 2));
+        sys_write32(reg_val, cfg_reg);
 
-	/*  Set priority on all global interrupts.   */
-	for (i = GIC_SPI_INT_BASE; i < gic_irqs; i += 4) {
-		sys_write32(0, GICD_IPRIORITYRn + i);
-	}
+        /* Group 0 */
+        uint32_t grp_reg = GICD_IGROUPRn + ((irq / 32) * 4);
+        reg_val = sys_read32(grp_reg);
+        reg_val &= ~(1U << (irq % 32));
+        sys_write32(reg_val, grp_reg);
 
-	/* Set all interrupts to group 0 */
-	for (i = GIC_SPI_INT_BASE; i < gic_irqs; i += 32) {
-		sys_write32(0, GICD_IGROUPRn + i / 8);
-	}
-
-	/*
-	 * Disable all interrupts.  Leave the PPI and SGIs alone
-	 * as these enables are banked registers.
-	 */
-	for (i = GIC_SPI_INT_BASE; i < gic_irqs; i += 32) {
+        /* Disable SPI and clear active */
+        sys_write32(1U << (irq % 32), GICD_ICENABLERn + ((irq / 32) * 4));
 #ifndef CONFIG_GIC_V1
-		sys_write32(0xffffffff, GICD_ICACTIVERn + i / 8);
+        sys_write32(1U << (irq % 32), GICD_ICACTIVERn + ((irq / 32) * 4));
 #endif
-		sys_write32(0xffffffff, GICD_ICENABLERn + i / 8);
-	}
+    }
 
-	/*
-	 * Enable the forwarding of pending interrupts
-	 * from the Distributor to the CPU interfaces
-	 */
-	sys_write32(1, GICD_CTLR);
+    /* Re-enable Distributor */
+    sys_write32(1, GICD_CTLR);
 }
 
 static void gic_cpu_init(void)
